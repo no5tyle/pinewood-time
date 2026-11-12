@@ -18,3 +18,5 @@ eval $RUN openscad -o renders/board-in-beam.png -D "'part=\"inside\"'" --imgsize
   --camera=205,-330,175,205,0,135 --projection=o finish-gate.scad
 eval $RUN openscad -o renders/usb-socket.png -D "'part=\"usb\"'" --imgsize=1200,1000 --colorscheme=Tomorrow \
   --camera=450,-160,210,300,0,110 --projection=p finish-gate.scad
+eval $RUN openscad -o renders/gate-exploded.png -D "'part=\"exploded\"'" --imgsize=1600,1300 --colorscheme=Tomorrow \
+  --camera=150,0,80,62,0,328,1000 --projection=p finish-gate.scad

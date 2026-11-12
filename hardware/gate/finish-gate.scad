@@ -433,3 +433,25 @@ if (part == "usb") {
     color("DimGray") cover();
     usb_socket();
 }
+
+// Exploded: each part pulled out along the way it goes on, for the assembly pictures
+if (part == "exploded") {
+    color("Gold") translate([-45, 0, 0]) left_half();
+    color("Orange") right_half();
+    // the board and Pico lifted out of the beam, the cover above them, the key above that
+    translate([0, 0, 42]) {
+        color("DarkGreen") { p = pcb_xy([0, 0]); translate([p[0], p[1] - pcb[1], pcb_z]) cube(pcb); }
+        color("Black") { p = pcb_xy([126, 3.5]); translate([p[0], p[1] - 21, pcb_z + pcb[2] + 2.5]) cube([51.5, 21, 1]); }
+    }
+    translate([0, 0, 75]) {
+        color("DimGray") cover();
+        color("White") { l = pcb_xy(pcb_led); translate([l[0], l[1], beam_z1 + cover_t + 8]) led_lens(); }
+    }
+    color("Black") { k = pcb_xy(pcb_key); translate([k[0] - 9, k[1] - 9, beam_z1 + cover_t + 98]) cube([18, 18, 8]); }
+    // the receivers dropped out of their pods, the USB socket out of the leg
+    color("Black") for (x = lanes) translate([sen_x0(x), -sen[1] / 2, beam_z0 - pod_s - 28]) cube(sen);
+    translate([45, 0, 0]) usb_socket();
+    // the sensor bar below the track, emitters below it
+    translate([0, 0, -30]) color("OrangeRed") sensor_bar();
+    color("Black") for (x = lanes) translate([sen_x0(x), -sen[1] / 2, -30 + bar_bot - 22]) cube(sen);
+}
