@@ -59,6 +59,7 @@ the chequers and FINISH start (at 40.0 mm).
 | 6 | M2 × 10 self-tapping screws | one through each sensor's mounting hole |
 | 2 | M4 × 16 bolts and M4 nuts | the thumbscrews: the nuts press into the underside of the bar's ends, and the bolts screw up against the board until snug |
 | 1 | MX switch (any) and a 1u keycap | optional: the button |
+| 1 | Adafruit panel-mount USB-C to Micro-B cable (ADA4056), with its two M3 screws | optional: USB-C on the right leg |
 
 ## Sensors: will they fit?
 
@@ -120,8 +121,19 @@ The bottom of a car body breaks each beam as the car passes over the rail.
 The board lies in the right half of the beam, from just past the joint to near the right leg. It rests on
 a ledge along each side wall, 4 mm above the beam's floor so its leads and the sensor cables pass under
 it; two M2.5 screws hold its left end to bosses, and two ribs under the cover hold the Pico's end down by
-its edges. The Pico's USB socket faces the right leg: the cable goes into the leg and down its channel
-(13 × 12 mm, so a USB-A plug goes through) and out of the slot at the back, at track level.
+its edges. The Pico's USB socket faces the right leg.
+
+**USB-C on the outside:** Adafruit's [panel-mount USB-C to Micro-B cable](https://core-electronics.com.au/panel-mount-cable-usb-c-to-micro-b-male-30cm.html)
+(ADA4056, about A$10.60 at Core Electronics) makes the gate all-in-one. Its USB-C socket screws to the
+outer face of the right leg at beam height, standing upright, and its Micro-B end plugs into the Pico; the
+race computer then connects with any USB-C cable. The socket's 13 mm body runs 40.5 mm inside the beam,
+in front of the Pico's plug and clear of the board, and its two M3 screws tap into bosses inside the leg.
+Push the spare length of its 30 cm lead down the right leg's channel.
+
+![The USB-C socket on the right leg](renders/usb-socket.png)
+
+Without it, plug an ordinary Micro-B cable into the Pico and feed its far end down the right leg's
+channel (13 × 12 mm, so a USB-A plug goes through) and out of the slot at the back, at track level.
 
 Above the board there's 20 mm to the cover. That's room for the upright resistors, the JST sockets with
 their plugs in, and the Pico on short headers; the MX key sits over the Pico. Solder the Pico flat or on
@@ -142,8 +154,10 @@ their plugs in, and the Pico on short headers; the MX key sits over the Pico. So
 5. Crimp each receiver to its lane's 4-pin JST XH plug: red to pin 4 (5V), black to pin 3 (GND), white
    to pin 2 (SIG), pin 1 empty. The emitters don't go to the lane plugs; they're powered by the bar's lead.
 6. Wire the MX switch's two pins to a 2-pin JST XH plug for the RESET socket (J10).
-7. Plug the USB cable into the Pico and feed its far end into the right leg and down and out of the slot
-   at the back. Lower the board onto its ledges, Pico to the right, plug everything in, and screw its
+7. USB-C socket: feed its Micro-B end in through the hole in the right leg from outside, and screw the
+   socket's flange on with its two M3 screws. (Or, without it, feed an ordinary cable down the right leg
+   from inside.) Lower the board onto its ledges, Pico to the right, plug the Micro-B into the Pico and
+   everything else into its sockets, push the spare USB lead down the right leg, and screw the board's
    left end down.
 8. Push the lens into the cover, clip in the switch (or the blank), and screw the cover down: its ribs
    hold the Pico's end of the board.

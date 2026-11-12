@@ -86,8 +86,17 @@ pcb_key = [150, 14];              // the MX switch sits over the Pico, clear of 
 led_top = pcb_z + pcb[2] + 9.6;   // the top of D1
 cover_x = [104, 292];             // the opening in the beam's top, over the board (and the USB plug)
 cover_y = 14.5;                   // half its width
+cover_screws_y = [[10, -10], [10, 0]]; // left end, right end (the USB socket's body passes the right one)
 cover_t = 3;                      // the cover's deck, on top of the beam
 join_bolts = [[95, 10], [95, -10]];   // M3 x 35, down through the joint (and the tongue)
+
+// USB-C on the outside: Adafruit's panel-mount USB-C to Micro-B cable (ADA4056; drawing 4056_PCM-A-003).
+// Its flange (28 x 8.5 mm, M3 screws 20 mm apart) screws to the right leg's outer face, standing upright;
+// its 13 mm body runs 40.5 mm inside, along the beam, beside the Pico's plug and clear of the board.
+usb_c = [-12, 140.5];             // the socket's centre on the leg's outer face: y, z
+usb_cut = [9.2, 13.8];            // the hole the body goes through (y, z)
+usb_screw = 10;                   // the screws, above and below the centre
+usb_body = 40.5;
 
 // ================================================================== Helpers
 module rbox(size, r) {            // a box with rounded vertical edges, from the origin
@@ -170,8 +179,19 @@ module beam_cavity() {
     translate([x0 + 3, -beam_d / 2 + wall, beam_z0 + bot_wall]) cube([x1 - x0 - 6, beam_d - 2 * wall, beam_h - bot_wall - wall]);
 }
 
-// Inside the beam: what the board and the cover fix to
+// The USB-C socket's hole in the right leg's outer face, rounded at the corners
+module usb_hole() {
+    translate([x1 + 1, usb_c[0], usb_c[1]]) rotate([0, -90, 0]) linear_extrude(wall + 2)
+        offset(r = 1.5) offset(delta = -1.5) square([usb_cut[1], usb_cut[0]], center = true);
+}
+
+// Inside the beam: what the board, the cover and the USB socket fix to
 module beam_insides() {
+    // bosses for the USB socket's two screws (they tap into 2.6 mm holes), clear of its body
+    for (s = [-1, 1]) translate([x1 - wall - 6, usb_c[0], usb_c[1] + s * usb_screw]) rotate([0, 90, 0]) difference() {
+        cylinder(d = 7, h = 6.01);
+        translate([0, 0, -1]) cylinder(d = 2.6, h = 12);
+    }
     // the board rests on a ledge along each side wall, and its left end screws to two bosses
     for (sy = [-1, 1]) translate([pcb_x0, sy > 0 ? pcb[1] / 2 - 0.5 : -beam_d / 2 + wall - 0.01, beam_z0 + bot_wall - 0.01])
         cube([pcb[0] + 4, beam_d / 2 - wall - pcb[1] / 2 + 0.51, pcb_z - beam_z0 - bot_wall + 0.01]);
@@ -180,10 +200,10 @@ module beam_insides() {
         cylinder(d = 2.2, h = 10);
     }
     // a block across the beam at each end of the opening for the cover's screws (cables pass under them)
-    for (x = [cover_x[0] - 4, cover_x[1]]) translate([x, -beam_d / 2 + wall - 0.01, beam_z1 - wall - 9])
-        difference() {
-            cube([4, beam_d - 2 * wall + 0.02, 9.01]);
-            for (sy = [-1, 1]) translate([2, beam_d / 2 - wall + sy * 10, -1]) cylinder(d = 2.6, h = 11);
+    for (e = [0, 1]) let(x = e == 0 ? cover_x[0] - 4 : cover_x[1], y0 = e == 0 ? -beam_d / 2 + wall : -6)
+        translate([x, y0 - 0.01, beam_z1 - wall - 9]) difference() {
+            cube([4, beam_d / 2 - wall - y0 + 0.02, 9.01]);
+            for (y = cover_screws_y[e]) translate([2, y - y0, -1]) cylinder(d = 2.6, h = 11);
         }
 }
 
@@ -232,7 +252,7 @@ module leg_channels() {
     }
 }
 module gantry() {
-    difference() { union() { leg(-1); leg(1); beam(); sensor_pods(); } beam_cavity(); leg_channels(); }
+    difference() { union() { leg(-1); leg(1); beam(); sensor_pods(); } beam_cavity(); leg_channels(); usb_hole(); }
     beam_insides();
 }
 
@@ -278,7 +298,7 @@ module cover() {
             translate([l[0], l[1], led_top + 1]) cylinder(d = 8, h = beam_z1 - wall - led_top - 1 + 0.01);
         }
         // screws into the blocks at each end, countersunk
-        for (x = [cover_x[0] - 2, cover_x[1] + 2], sy = [-1, 1]) translate([x, sy * 10, beam_z1 - 1]) {
+        for (e = [0, 1], y = cover_screws_y[e]) translate([e == 0 ? cover_x[0] - 2 : cover_x[1] + 2, y, beam_z1 - 1]) {
             cylinder(d = 3.4, h = 10);
             translate([0, 0, 1 + cover_t - 1.8]) cylinder(d1 = 3.4, d2 = 6.6, h = 1.81);
         }
@@ -367,6 +387,7 @@ if (part == "assembly") {
     color("DimGray") cover();
     color("Black") { k = pcb_xy(pcb_key); translate([k[0] - 9, k[1] - 9, beam_z1 + cover_t]) cube([18, 18, 8]); }
     color("White") { l = pcb_xy(pcb_led); translate([l[0], l[1], beam_z1 + cover_t - 7]) led_lens(); }
+    usb_socket();
     color("Orange") sensor_bar();
 }
 // Print orientations: the gantry halves lie on their backs, chequers up; the cover prints upside down
@@ -394,5 +415,21 @@ if (part == "inside") {
     color("DimGray", 0.5) cover();
     color("DarkGreen") { p = pcb_xy([0, 0]); translate([p[0], p[1] - pcb[1], pcb_z]) cube(pcb); }
     color("Black") { p = pcb_xy([126, 3.5]); translate([p[0], p[1] - 21, pcb_z + pcb[2] + 2.5]) cube([51.5, 21, 1]); }
-    color("Silver") { p = pcb_xy([178, 14]); translate([p[0] + 1.3, p[1] - 4, pcb_z + pcb[2] + 4]) cube([18, 8, 4]); }
+    color("Silver") { p = pcb_xy([178, 14]); translate([p[0] + 1.3, p[1] - 4, pcb_z + pcb[2] + 4]) cube([27.5, 8, 5]); }
+    usb_socket();
+}
+
+// The USB-C panel socket (ADA4056) as fitted, for the previews and the clash check
+module usb_socket() {
+    color("DimGray") translate([x1, usb_c[0], usb_c[1]]) {
+        hull() for (s = [-1, 1]) translate([0, 0, s * 9.75]) rotate([0, 90, 0]) cylinder(d = 8.5, h = 3);
+        translate([-usb_body, -4.25, -6.5]) cube([usb_body, 8.5, 13]);
+    }
+}
+
+// The right leg from outside, with the USB-C socket fitted
+if (part == "usb") {
+    color("Orange") right_half();
+    color("DimGray") cover();
+    usb_socket();
 }

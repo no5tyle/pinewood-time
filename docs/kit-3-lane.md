@@ -24,7 +24,8 @@ Prices are rough, in Australian dollars with GST, from late 2026. Check the list
 | 1 | [SparkFun RGB LED, common cathode (COM-09264)](https://core-electronics.com.au/catalog/product/view/sku/COM-09264) | status light: check its legs run R, K, G, B (K longest) |
 | 1 | An MX keyboard switch and a 1u keycap | the button, in the finish gate's cover (or any push-to-make button on a cable) |
 | 1 | Lever microswitch | start gate |
-| 1 | Micro-USB data cable (not a charge-only one) | timer to the race computer |
+| 1 | [Adafruit panel-mount USB-C to Micro-B cable, 30 cm (ADA4056)](https://core-electronics.com.au/panel-mount-cable-usb-c-to-micro-b-male-30cm.html) | USB-C socket on the finish gate's right leg |
+| 1 | USB-C data cable (not a charge-only one) | gate to the race computer |
 | ~6 m | 4-core cable (alarm or phone cable is fine) | about 1.5 m a lane, and the gate |
 
 Optional: a panel-mount push button on 2-core cable, for a button at the finish line. It resets the
