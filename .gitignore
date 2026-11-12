@@ -1,0 +1,7 @@
+firmware/build*/
+firmware/test/test_core
+hardware/build/
+hardware/*.kicad_prl
+hardware/*-backups/
+hardware/fp-info-cache
+__pycache__/
