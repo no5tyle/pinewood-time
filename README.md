@@ -34,7 +34,8 @@ everything a timer needs, and the firmware for it.
 ## 1. Order the board
 
 Upload `hardware/fab/pinewood-time-gerbers.zip` to JLCPCB, PCBWay or similar. Settings: 2 layers,
-112 × 82 mm, 1.6 mm thick, any colour, HASL (lead-free or not) is fine. Everything else at the defaults.
+178 × 28 mm, 1.6 mm thick, any colour, HASL (lead-free or not) is fine. Everything else at the defaults.
+The board is long and narrow so it fits inside the [finish gate](hardware/gate)'s beam.
 
 ## 2. Get the parts
 
@@ -42,9 +43,10 @@ See [the parts list](hardware/fab/bom.md). In short, per board:
 
 - a Raspberry Pi Pico (or Pico 2), and 2 × 20-pin 2.54 mm male headers if yours hasn't got them
 - 1/4 W resistors: 8 × 180 Ω, 10 × 10k, 10 × 1k, 2 × 4.7k, 3 × 220 Ω
-- capacitors: 100 µF 10 V electrolytic (6.3 mm, 2.5 mm pitch), 2 × 100 nF ceramic (5 mm pitch)
+- capacitors: 100 µF 10 V electrolytic (6.3 mm, 2.5 mm pitch), 100 nF ceramic (5 mm pitch)
 - JST XH sockets: 8 × 4-pin (B4B-XH-A), 2 × 2-pin (B2B-XH-A), and matching plugs and crimps for your cables
-- 1 × 4 and 1 × 6 2.54 mm pin headers, a 6 × 6 mm tactile button, a 5 mm common-cathode RGB LED
+- 1 × 4 and 1 × 6 2.54 mm pin headers, a 5 mm common-cathode RGB LED
+- a button for the RESET socket: the gate's MX key, or any push-to-make button on a cable
 
 And for the track: a sensor per lane, a start gate switch, optionally a remote reset button and
 displays. See [wiring](docs/wiring.md).
@@ -53,12 +55,15 @@ You only need to fit as many lane sockets and resistor sets as you have lanes.
 
 ## 3. Solder it
 
-Lowest parts first: resistors, the ceramic capacitors, the button, then the LED (its longest leg, the common
-cathode, goes in the second hole, marked K), the electrolytic capacitor (+ to the square pad), the pin
-headers and JST sockets (turned to match their outlines on the board), and the Pico last.
+The resistors stand upright, three to a lane, with their values printed above them. Lowest parts first:
+the ceramic capacitor, the resistors (body down into the circle, the bent-over lead in the other hole),
+then the LED (its longest leg, the common cathode, goes in the second hole), the electrolytic capacitor
+(+ to the square pad), the pin headers and JST sockets (turned to match their outlines on the board), and
+the Pico last.
 
-Solder the Pico with its USB socket over the notch in the board edge, either on pin headers (so it can be
-swapped) or flat on its castellated edges.
+The Pico goes at the right-hand end with its USB socket just past the end of the board, either on pin
+headers (so it can be swapped) or flat on its castellated edges. Inside the gate, solder it flat or on
+short (2.5 mm) headers, so there's room above it for the MX key.
 
 ## 4. Flash the firmware
 

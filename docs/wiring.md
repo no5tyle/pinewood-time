@@ -62,8 +62,8 @@ The timer won't get ready with the gate open (it replies `O`), so a race can't s
 
 ## Reset button (RESET)
 
-A 2-pin socket wired across the button on the board, for a button on a cable at the start or finish:
-1 = SW, 2 = GND, any push-to-make button. Press it to get ready for the next race; during a race it ends the
+A 2-pin socket for the button: the [finish gate](../hardware/gate)'s MX key, or any push-to-make button
+on a cable at the start or finish. 1 = SW, 2 = GND. Press it to get ready for the next race; during a race it ends the
 race. Hold it while plugging in for test mode. With `#button next` it asks the race software for the next heat instead
 (see [the protocol](protocol.md#the-reset-button-next-heat)).
 

@@ -9,7 +9,7 @@ Prices are rough, in Australian dollars with GST, from late 2026. Check the list
 ## Shopping list
 
 **JLCPCB:** 5 boards from [`hardware/fab/pinewood-time-gerbers.zip`](../hardware/fab/pinewood-time-gerbers.zip)
-(5 is the minimum order). 2 layers, 112 × 82 mm, 1.6 mm, anything else at the defaults.
+(5 is the minimum order). 2 layers, 178 × 28 mm, 1.6 mm, anything else at the defaults.
 
 **Core Electronics:**
 
@@ -19,10 +19,10 @@ Prices are rough, in Australian dollars with GST, from late 2026. Check the list
 | 3 | [Adafruit IR break-beam sensor, 3 mm (ADA2167)](https://core-electronics.com.au/catalog/product/view/sku/ADA2167) | lanes 1-3 |
 | 1 | [SparkFun resistor kit, 1/4 W, 500 pcs (COM-10969)](https://core-electronics.com.au/resistor-kit-1-4w-500-total.html) | 5 × 10k, 5 × 1k, 3 × 220 Ω |
 | 1 | DFRobot JST connector kit (FIT0255) | lane, gate and reset sockets, plugs and crimps |
-| 2 | [100 nF ceramic capacitor (CE05188)](https://core-electronics.com.au/100nf-ceramic-disc-capacitor.html) | C2, C3 |
+| 1 | [100 nF ceramic capacitor (CE05188)](https://core-electronics.com.au/100nf-ceramic-disc-capacitor.html) | C2 |
 | 1 | [100 µF radial capacitor (CE05258)](https://core-electronics.com.au/radial-capacitor-100uf.html) | C1: check it's 6.3 mm across with legs 2.5 mm apart |
 | 1 | [SparkFun RGB LED, common cathode (COM-09264)](https://core-electronics.com.au/catalog/product/view/sku/COM-09264) | status light: check its legs run R, K, G, B (K longest) |
-| 1 | 6 × 6 mm through-hole tactile buttons, e.g. [ADA1490](https://core-electronics.com.au/tactile-switch-buttons-6mm-tall-x-10-pack.html) | reset button on the board: check it's the 4-leg kind |
+| 1 | An MX keyboard switch and a 1u keycap | the button, in the finish gate's cover (or any push-to-make button on a cable) |
 | 1 | Lever microswitch | start gate |
 | 1 | Micro-USB data cable (not a charge-only one) | timer to the race computer |
 | ~6 m | 4-core cable (alarm or phone cable is fine) | about 1.5 m a lane, and the gate |
@@ -48,10 +48,11 @@ Notes on the kits:
 | J1, J2, J3 (lane sockets) | R1-R8 |
 | R11, R12, R13 (10k) | R14-R18, R24-R28 |
 | R21, R22, R23 (1k) | J11, R35, R36 (displays) |
-| J9, R31 (10k), R32 (1k): gate | J12 (spare pins) |
-| J10, R33 (10k), R34 (1k), SW1: reset | |
+| J9, R31 (10k), R32 (1k): gate | |
+| J10, R33 (10k), R34 (1k): reset | |
+| J12: 5V and GND for the finish gate's emitters | |
 | D1, R37, R38, R39 (220 Ω): status light | |
-| C1, C2, C3 | |
+| C1, C2 | |
 
 The empty places do no harm and can be filled later for more lanes. Solder the lowest parts first, and see
 the [README](../README.md#3-solder-it) for which way round the parts go.

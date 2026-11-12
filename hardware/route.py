@@ -20,13 +20,14 @@ import pcbnew
 HERE = os.path.dirname(os.path.abspath(__file__))
 BOARD = os.path.join(HERE, "pinewood-time.kicad_pcb")
 
-RES = 0.2  # grid, mm
-CLEARANCE = 0.3  # mm, a little over the design rules' 0.25 so the grid's rounding can't break them
+RES = 0.1  # grid, mm
+GRAIN = "long"  # "square" or "long": which way the tracks prefer to run (see astar)
+CLEARANCE = 0.25  # mm: the power class's clearance, a little over the signals' 0.2
 EDGE = 0.6  # copper to board edge, mm
 VIA_D, VIA_DRILL = 0.8, 0.4
 VIA_COST = 25.0
-POWER = {"VBUS": 0.6, "+3V3": 0.6, "VSYS": 0.6}
-SIGNAL_W = 0.3
+POWER = {"VBUS": 0.5, "+3V3": 0.5, "VSYS": 0.5}
+SIGNAL_W = 0.25
 LAYERS = [pcbnew.F_Cu, pcbnew.B_Cu]
 # Gentle preferences that keep the layers from fighting: front mostly horizontal, back mostly vertical
 DIRS = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]
@@ -144,7 +145,12 @@ def pad_copper(pad):
     return Copper(net, (0, 1), "rect", cx=cx, cy=cy, hw=sx / 2, hh=sy / 2)
 
 
-def route():
+GND_W = 0.3       # ground gets tracks too (laid last), so it doesn't depend on the pours alone
+ATTEMPTS = 6
+
+
+def attempt(first):
+    """One go at routing everything, nets in `first` before the rest. Returns (board, failed nets)"""
     board = pcbnew.LoadBoard(BOARD)
     for t in list(board.GetTracks()):
         board.Remove(t)
@@ -152,8 +158,9 @@ def route():
 
     copper = []  # everything placed so far: pads, then tracks and vias as they're routed
     pads_by_net = {}
-    for fp in board.GetFootprints():
-        for pad in fp.Pads():
+    # in a fixed order (the file's order changes from save to save), so a board always routes the same way
+    for fp in sorted(board.GetFootprints(), key=lambda f: f.GetReference()):
+        for pad in sorted(fp.Pads(), key=lambda p: p.GetNumber()):
             c = pad_copper(pad)
             if pad.GetAttribute() == pcbnew.PAD_ATTRIB_NPTH:
                 # mounting hole: blocks both layers
@@ -163,20 +170,28 @@ def route():
             if pad.GetNetname():
                 pads_by_net.setdefault(pad.GetNetname(), []).append((pad, c))
 
-    nets = [n for n, ps in pads_by_net.items() if n != "GND" and len(ps) >= 2]
-    # Power first (widest, most pins), then signals from shortest to longest
+    nets = sorted(n for n, ps in pads_by_net.items() if len(ps) >= 2)
     def span(n):
         ps = [(to_mm(p.GetPosition().x), to_mm(p.GetPosition().y)) for p, _ in pads_by_net[n]]
         return max(math.dist(a, b) for a in ps for b in ps)
-    nets.sort(key=lambda n: (0 if n in POWER else 1, span(n) if n not in POWER else -len(pads_by_net[n])))
+    # Nets that failed last time first; then power (widest, most pins); then signals, shortest first;
+    # ground last (the pours do most of its work)
+    nets.sort(key=lambda n: (0 if n in first else 1, 2 if n == "GND" else 0 if n in POWER else 1,
+                             span(n) if n not in POWER else -len(pads_by_net[n])))
+    widths = dict(POWER, GND=GND_W)
+    failed = [n for n in nets if not route_net(board, grid, copper, n, pads_by_net[n], widths.get(n, SIGNAL_W))]
+    return board, failed
 
-    failed = []
-    for name in nets:
-        w = POWER.get(name, SIGNAL_W)
-        if not route_net(board, grid, copper, name, pads_by_net[name], w):
-            failed.append(name)
+
+def route():
+    first = []
+    for k in range(ATTEMPTS):
+        board, failed = attempt(first)
+        print(f"attempt {k + 1}: " + (f"failed {failed}" if failed else "every net routed"))
+        if not failed:
+            break
+        first = failed + [n for n in first if n not in failed]
     pcbnew.SaveBoard(BOARD, board)
-    print(f"routed {len(nets) - len(failed)} of {len(nets)} nets" + (f"; failed: {failed}" if failed else ""))
     return failed
 
 
@@ -244,7 +259,6 @@ def route_net(board, grid, copper, name, pads, w):
                 targets.add((li, j * W + i))
         path = astar(grid, blocked, viab, tree, targets)
         if not path:
-            print(f"  could not route {name} to {target_pad.GetParent().GetReference()}.{target_pad.GetNumber()}")
             ok = False
             continue
         before = len(copper)
@@ -308,9 +322,13 @@ def astar(grid, blocked, viab, sources, targets):
                 step = 1.414
             else:
                 step = 1.0
-            # front horizontal, back vertical: going against the grain costs a little more
-            if (li == 0 and dj and not di) or (li == 1 and di and not dj):
-                step *= 1.6
+            # on a square board, front mostly horizontal and back mostly vertical keeps the layers from
+            # fighting; on a long thin one both run lengthways, so going across costs a little more
+            if GRAIN == "square":
+                if (li == 0 and dj and not di) or (li == 1 and di and not dj):
+                    step *= 1.6
+            elif dj and not di:
+                step *= 1.3
             ng = gc + step
             if ng < g.get(nn, 1e18):
                 g[nn] = ng

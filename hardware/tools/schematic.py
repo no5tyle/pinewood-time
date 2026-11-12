@@ -97,7 +97,7 @@ txt(36, 312, "A break-beam receiver or phototransistor switches SIG to GND as a 
 # ---- Start gate and reset
 panel(600, 20, 580, 300, "Start gate and reset", "Switches to GND")
 for k, (j, g, nm, r1, r2) in enumerate([("J9 GATE", "GP18", "gate switch", "R31", "R32"),
-                                         ("J10 RESET", "GP19", "button", "R33", "R34")]):
+                                         ("J10 RESET", "GP19", "MX key", "R33", "R34")]):
     y = 130 + k * 110
     pin(680, y, "1"); pin(680, y + 30, "2")
     txt(680, y - 22, j, 13, "middle", weight=700)
@@ -107,15 +107,6 @@ for k, (j, g, nm, r1, r2) in enumerate([("J9 GATE", "GP18", "gate switch", "R31"
     rail(820, y - 60 if k == 0 else y - 50, "3V3")
     res(820, y, 990, y, r2, "1k")
     gpio(992, y, g)
-# SW1 in parallel with J10
-y = 240
-dot(760, y)
-line((760, y), (760, y + 10)); dot(760, y + 10)
-line((760, y + 10), (776, y + 24))
-dot(760, y + 26); line((760, y + 26), (760, y + 34)); gnd(760, y + 34)
-txt(780, y + 30, "SW1", 12)
-txt(600 + 290, 306, "SW1 on the board is wired across J10, so either button resets.", 11, "middle", MUTED)
-
 # ---- Status LED
 panel(20, 340, 370, 260, "Status light", "D1: 5 mm RGB, common cathode")
 for k, (g, r, c) in enumerate([("GP20", "R37", "R"), ("GP21", "R38", "G"), ("GP22", "R39", "B")]):
@@ -146,7 +137,7 @@ txt(426, 590, "HT16K33 backpacks, address 0x70 + lane - 1", 11, c=MUTED)
 
 # ---- Power
 panel(800, 340, 380, 260, "Power (from the Pico's USB)", "VBUS (pin 40) = 5V rail; 3V3 OUT (pin 36) = 3V3 rail")
-for k, (name, caps) in enumerate([("5V", [("C1", "100µF"), ("C3", "100nF")]), ("3V3", [("C2", "100nF")])]):
+for k, (name, caps) in enumerate([("5V", [("C1", "100µF")]), ("3V3", [("C2", "100nF")])]):
     y = 430 + k * 90
     gpio(820, y, "VBUS" if k == 0 else "3V3 OUT")
     line((894, y), (1150, y))

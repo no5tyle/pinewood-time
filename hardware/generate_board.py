@@ -25,9 +25,10 @@ BOARD = os.path.join(HERE, "pinewood-time.kicad_pcb")
 PROJECT = os.path.join(HERE, "pinewood-time.kicad_pro")
 FP = "/usr/share/kicad/footprints"
 
-VERSION = "v1.0"
-# Board size, mm. Everything is placed from its top-left corner
-W, H = 112.0, 82.0
+VERSION = "v1.1"
+# Board size, mm. Everything is placed from its top-left corner. Long and narrow, to fit inside the finish
+# gate's beam (hardware/gate): 178 x 28 mm
+W, H = 178.0, 28.0
 ORIGIN = (100.0, 60.0)  # where the board sits on KiCad's page
 
 LANES = 8
@@ -60,74 +61,63 @@ def part(ref, lib, name, value, x, y, rot=0, nets=None, desc="", mpn="", lcsc=""
                       mpn=mpn, lcsc=lcsc))
 
 
-# Pico: left edge 52 mm in, 1.5 mm below the top edge (a notch in the edge clears the USB plug)
-PICO_X, PICO_Y = 52.0, 1.5
-part("U1", None, "RaspberryPi_Pico", "Raspberry Pi Pico", PICO_X, PICO_Y,
+# The Pico at the right-hand end, lying along the board with its USB socket out past the end. Rotated so
+# its pins 1-20 run along the top edge (pin 1 at the right) and 21-40 along the bottom
+PICO_X, PICO_Y = W - 0.5, 3.5     # its USB end, top corner
+part("U1", None, "RaspberryPi_Pico", "Raspberry Pi Pico", PICO_X, PICO_Y, rot=-90,
      nets=PICO_PINS, desc="Raspberry Pi Pico (RP2040) or Pico 2 (RP2350), on 2x20 pin headers or soldered flat",
      mpn="SC0915")
 
-ROW0, ROW_PITCH = 8.0, 9.2
+# Lanes: a column each, left to right. Three upright resistors across the top, the socket below them
+# (its pins running down the board: 1 LED+, 2 SIG, 3 GND, 4 5V)
+R_VERT = "R_Axial_DIN0207_L6.3mm_D2.5mm_P2.54mm_Vertical"
+LANE_X0, LANE_PITCH = 12.5, 10.5
+R_Y, J_Y = 6.6, 13.6
 for i in range(LANES):
     n = i + 1
-    y = ROW0 + i * ROW_PITCH
-    part(f"J{n}", "Connector_JST", "JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical", f"LANE {n}", 3.5, y,
+    cx = LANE_X0 + i * LANE_PITCH
+    part(f"J{n}", "Connector_JST", "JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical", f"LANE {n}", cx, J_Y, rot=-90,
          nets={1: f"LED{n}", 2: f"SENSE{n}", 3: "GND", 4: "VBUS"},
          desc="Lane sensor socket, JST XH 4-pin, 2.5 mm", mpn="JST B4B-XH-A", lcsc="C144395")
-    part(f"R{n}", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", "180", 18.5, y,
+    part(f"R{n}", "Resistor_THT", R_VERT, "180", cx - 3.3, R_Y, rot=-90,
          nets={1: "VBUS", 2: f"LED{n}"}, desc="IR emitter current limit, 1/4 W (about 20 mA at 5 V)")
-    part(f"R{10 + n}", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", "10k", 29.5, y,
+    part(f"R{10 + n}", "Resistor_THT", R_VERT, "10k", cx, R_Y, rot=-90,
          nets={1: "+3V3", 2: f"SENSE{n}"}, desc="Sensor pull-up to 3.3 V, 1/4 W")
-    part(f"R{20 + n}", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", "1k", 40.5, y,
+    part(f"R{20 + n}", "Resistor_THT", R_VERT, "1k", cx + 3.3, R_Y, rot=-90,
          nets={1: f"SENSE{n}", 2: f"LANE{n}"}, desc="Series protection for the Pico input, 1/4 W")
 
-# Right-hand side: start gate, reset, status light, displays, spare pins
-RX = 80.0
-part("J9", "Connector_JST", "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical", "GATE", 101.0, 8.0,
+# Between the lanes and the Pico: start gate, reset, displays, spare pins, status light, supply caps
+part("J9", "Connector_JST", "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical", "GATE", 96.5, J_Y, rot=-90,
      nets={1: "GATE", 2: "GND"}, desc="Start gate switch socket, JST XH 2-pin", mpn="JST B2B-XH-A", lcsc="C158012")
-part("J10", "Connector_JST", "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical", "RESET", 101.0, 18.0,
-     nets={1: "RESET", 2: "GND"}, desc="Remote reset button socket, JST XH 2-pin", mpn="JST B2B-XH-A", lcsc="C158012")
-part("R31", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", "10k", RX, 11.0,
-     nets={1: "+3V3", 2: "GATE"}, desc="Gate pull-up to 3.3 V, 1/4 W")
-part("R32", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", "1k", RX, 15.0,
-     nets={1: "GATE", 2: "GATE_IN"}, desc="Series protection, 1/4 W")
-part("R33", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", "10k", RX, 19.0,
-     nets={1: "+3V3", 2: "RESET"}, desc="Reset pull-up to 3.3 V, 1/4 W")
-part("R34", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", "1k", RX, 23.0,
-     nets={1: "RESET", 2: "RESET_IN"}, desc="Series protection, 1/4 W")
-part("SW1", "Button_Switch_THT", "SW_PUSH_6mm", "RESET", 96.0, 25.5,
-     nets={1: "RESET", 2: "GND"}, desc="Reset button, 6x6 mm tactile, through-hole (4 legs)", mpn="any 6x6 mm THT, e.g. Omron B3F-1000")
-
-part("J11", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", "DISPLAYS", 107.0, 37.0,
+part("J10", "Connector_JST", "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical", "RESET", 104.0, J_Y, rot=-90,
+     nets={1: "RESET", 2: "GND"}, desc="Reset button socket (the gate's MX key), JST XH 2-pin", mpn="JST B2B-XH-A", lcsc="C158012")
+for ref, x, value, nets, desc in [
+        ("R31", 94.5, "10k", {1: "+3V3", 2: "GATE"}, "Gate pull-up to 3.3 V, 1/4 W"),
+        ("R32", 97.8, "1k", {1: "GATE", 2: "GATE_IN"}, "Series protection, 1/4 W"),
+        ("R33", 101.1, "10k", {1: "+3V3", 2: "RESET"}, "Reset pull-up to 3.3 V, 1/4 W"),
+        ("R34", 104.4, "1k", {1: "RESET", 2: "RESET_IN"}, "Series protection, 1/4 W"),
+        ("R35", 107.7, "4.7k", {1: "+3V3", 2: "SCL"}, "I2C pull-up, 1/4 W"),
+        ("R36", 111.0, "4.7k", {1: "+3V3", 2: "SDA"}, "I2C pull-up, 1/4 W"),
+        ("R37", 114.3, "220", {1: "LED_R_IN", 2: "LED_R"}, "Status light, red, 1/4 W"),
+        ("R38", 117.6, "220", {1: "LED_G_IN", 2: "LED_G"}, "Status light, green, 1/4 W"),
+        ("R39", 120.9, "220", {1: "LED_B_IN", 2: "LED_B"}, "Status light, blue, 1/4 W")]:
+    part(ref, "Resistor_THT", R_VERT, value, x, R_Y, rot=-90, nets=nets, desc=desc)
+part("J11", "Connector_PinHeader_2.54mm", "PinHeader_1x04_P2.54mm_Vertical", "DISPLAYS", 93.5, 24.0, rot=90,
      nets={1: "GND", 2: "+3V3", 3: "SCL", 4: "SDA"},
      desc="I2C header for lane displays (HT16K33 4-digit backpacks, address 0x70 + lane - 1), 1x4 2.54 mm")
-part("R35", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", "4.7k", RX, 33.0,
-     nets={1: "+3V3", 2: "SCL"}, desc="I2C pull-up, 1/4 W")
-part("R36", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", "4.7k", RX, 37.0,
-     nets={1: "+3V3", 2: "SDA"}, desc="I2C pull-up, 1/4 W")
-
-part("J12", "Connector_PinHeader_2.54mm", "PinHeader_1x06_P2.54mm_Vertical", "AUX", 107.0, 51.0,
+part("J12", "Connector_PinHeader_2.54mm", "PinHeader_1x06_P2.54mm_Vertical", "AUX", 105.0, 24.0, rot=90,
      nets={1: "GND", 2: "+3V3", 3: "VBUS", 4: "AUX1", 5: "AUX2", 6: "AUX3"},
-     desc="Spare pins: GP26, GP27, GP28 (buzzer, start solenoid driver, ...), 1x6 2.54 mm")
-
-part("D1", "LED_THT", "LED_D5.0mm-4_RGB_Wide_Pins", "RGB", 84.0, 64.0,
+     desc="Spare pins: GND, 3V3, 5V (powers the gate's track emitters), GP26, GP27, GP28, 1x6 2.54 mm")
+part("D1", "LED_THT", "LED_D5.0mm-4_RGB_Wide_Pins", "RGB", 110.0, 15.0,
      nets={1: "LED_R", 2: "GND", 3: "LED_G", 4: "LED_B"},
      desc="Status light, 5 mm RGB LED, common cathode, pins R-K-G-B (cathode longest)")
-part("R37", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", "220", RX, 47.0,
-     nets={1: "LED_R_IN", 2: "LED_R"}, desc="Status light, red, 1/4 W")
-part("R38", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", "220", RX, 51.0,
-     nets={1: "LED_G_IN", 2: "LED_G"}, desc="Status light, green, 1/4 W")
-part("R39", "Resistor_THT", "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal", "220", RX, 55.0,
-     nets={1: "LED_B_IN", 2: "LED_B"}, desc="Status light, blue, 1/4 W")
-
-part("C1", "Capacitor_THT", "CP_Radial_D6.3mm_P2.50mm", "100uF 10V", 79.0, 4.8,
+part("C1", "Capacitor_THT", "CP_Radial_D6.3mm_P2.50mm", "100uF 10V", 120.5, 15.0,
      nets={1: "VBUS", 2: "GND"}, desc="5 V supply bulk, electrolytic, 6.3 mm, 2.5 mm pitch")
-part("C2", "Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P5.00mm", "100nF", 87.0, 3.0,
+part("C2", "Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P5.00mm", "100nF", 124.4, 1.8, rot=-90,
      nets={1: "+3V3", 2: "GND"}, desc="3.3 V decoupling, ceramic, 5 mm pitch")
-part("C3", "Capacitor_THT", "C_Disc_D5.0mm_W2.5mm_P5.00mm", "100nF", 3.5, 78.5,
-     nets={1: "VBUS", 2: "GND"}, desc="5 V decoupling, ceramic, 5 mm pitch")
 
-for i, (x, y) in enumerate([(21.0, 78.5), (60.0, 78.5), (107.5, 78.5), (107.5, 30.5)]):
-    part(f"H{i + 1}", "MountingHole", "MountingHole_3.2mm_M3", "M3", x, y, desc="M3 mounting hole")
+for i, (x, y) in enumerate([(3.5, 5.5), (3.5, 22.5)]):
+    part(f"H{i + 1}", "MountingHole", "MountingHole_2.7mm_M2.5", "M2.5", x, y, desc="M2.5 mounting hole")
 
 
 # ------------------------------------------------------------------------------------------------ Footprints
@@ -211,6 +201,9 @@ def load(p):
         ref.SetPosition(ref.GetPos0())
         ref.SetTextSize(pcbnew.VECTOR2I(pcbnew.FromMM(0.8), pcbnew.FromMM(0.8)))
         ref.SetTextThickness(pcbnew.FromMM(0.12))
+    elif p["name"] == R_VERT:
+        # Upright resistors stand too close for their references: labels() prints each one's value instead
+        ref.SetVisible(False)
     elif p["ref"][0] in "RC":
         # Resistors and capacitors: the reference inside the part's outline, clear of its neighbours
         pads = [pad.GetPos0() for pad in fp.Pads()]
@@ -225,9 +218,8 @@ def load(p):
 
 # ------------------------------------------------------------------------------------------------ Board
 def outline(board):
-    """The board edge, with a notch at the top that clears the Pico's USB plug"""
-    notch_l, notch_r, notch_d = PICO_X + 5.0, PICO_X + 16.0, 6.0
-    pts = [(0, 0), (notch_l, 0), (notch_l, notch_d), (notch_r, notch_d), (notch_r, 0), (W, 0), (W, H), (0, H), (0, 0)]
+    """The board edge: a plain rectangle (the Pico's USB socket overhangs the right-hand end)"""
+    pts = [(0, 0), (W, 0), (W, H), (0, H), (0, 0)]
     for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
         seg = pcbnew.PCB_SHAPE(board)
         seg.SetShape(pcbnew.SHAPE_T_SEGMENT)
@@ -266,18 +258,18 @@ def write_project(path):
                     "min_hole_to_hole": 0.25, "min_copper_edge_clearance": 0.5, "min_hole_clearance": 0.25,
                     "min_silk_clearance": 0.0,
                 },
-                "track_widths": [0.0, 0.3, 0.6, 0.8],
+                "track_widths": [0.0, 0.25, 0.5, 0.8],
                 "via_dimensions": [{"diameter": 0.0, "drill": 0.0}, {"diameter": 0.8, "drill": 0.4}],
             }
         },
         "meta": {"filename": "pinewood-time.kicad_pro", "version": 1},
         "net_settings": {
             "classes": [
-                {"name": "Default", "clearance": 0.25, "track_width": 0.3, "via_diameter": 0.8, "via_drill": 0.4,
+                {"name": "Default", "clearance": 0.2, "track_width": 0.25, "via_diameter": 0.8, "via_drill": 0.4,
                  "diff_pair_gap": 0.25, "diff_pair_width": 0.2, "microvia_diameter": 0.3, "microvia_drill": 0.1,
                  "line_style": 0, "wire_width": 6, "bus_width": 12, "pcb_color": "rgba(0, 0, 0, 0.000)",
                  "schematic_color": "rgba(0, 0, 0, 0.000)"},
-                {"name": "Power", "clearance": 0.3, "track_width": 0.6, "via_diameter": 1.0, "via_drill": 0.5,
+                {"name": "Power", "clearance": 0.25, "track_width": 0.5, "via_diameter": 1.0, "via_drill": 0.5,
                  "diff_pair_gap": 0.25, "diff_pair_width": 0.2, "microvia_diameter": 0.3, "microvia_drill": 0.1,
                  "line_style": 0, "wire_width": 6, "bus_width": 12, "pcb_color": "rgba(0, 0, 0, 0.000)",
                  "schematic_color": "rgba(0, 0, 0, 0.000)"},
@@ -352,36 +344,29 @@ def ground_pour(board, layer):
 
 
 def labels(board):
-    # The labelled sockets and the LED say what they are in words instead of J1, J9...
-    named = {f"J{i + 1}" for i in range(LANES)} | {"J9", "J10", "D1"}
+    # The sockets, LED and capacitors say what they are in words instead of J1, D1, C1...
     for fp in board.GetFootprints():
-        if fp.GetReference() in named:
+        if fp.GetReference()[0] in "JDC":
             fp.Reference().SetVisible(False)
-    # Each lane socket: its number, and (once, at the top) what each pin is
+    # Each resistor's value above it (they stand too close for references)
+    for p in PARTS:
+        if p["name"] == R_VERT:
+            text(board, p["value"], p["x"], R_Y - 3.3, 0.8)
+    # Lane numbers between the sockets, and once, what each socket pin is
     for i in range(LANES):
-        y = ROW0 + i * ROW_PITCH
-        text(board, f"LANE {i + 1}", 1.0, y - 4.4, 1.0, bold=True, justify_left=True)
-    text(board, "LED+ SIG GND 5V", 8.6, ROW0 - 4.4, 0.8, justify_left=True)
-    text(board, "IR LED      PULL-UP   SERIES", 30.0, ROW0 - 4.4, 0.8)
-    # Gate and reset sockets
-    text(board, "GATE  SIG GND", 104.0, 4.4, 0.8)
-    text(board, "RESET  SW GND", 104.0, 14.4, 0.8)
-    # The two headers run downwards: name each pin beside it
+        text(board, f"{i + 1}", LANE_X0 + i * LANE_PITCH + 4.7, J_Y, 1.2, bold=True)
+    for k, name in enumerate(["LED+", "SIG", "GND", "5V"]):
+        text(board, name, LANE_X0 - 4.2, J_Y + k * 2.5, 0.8, justify_right=True)
+    text(board, "GATE", 96.0, 20.2, 0.8)
+    text(board, "RESET", 103.6, 20.2, 0.8)
     for k, name in enumerate(["GND", "3V3", "SCL", "SDA"]):
-        text(board, name, 105.2, 37.0 + k * 2.54, 0.8, justify_right=True)
-    text(board, "DISPLAYS", 105.2, 34.6, 0.8, justify_right=True)
-    for k, name in enumerate(["GND", "3V3", "5V", "GP26", "GP27", "GP28"]):
-        text(board, name, 105.2, 51.0 + k * 2.54, 0.8, justify_right=True)
-    text(board, "AUX", 105.2, 48.6, 0.8, justify_right=True)
-    # Status LED: its leg order above, its name below
-    text(board, "R  K  G  B", 87.1, 60.6, 0.8)
-    text(board, "STATUS", 87.1, 68.6, 0.8)
-    # Title, and a note on the back
-    text(board, "pinewood-time", 36.5, 77.4, 2.0, bold=True)
-    text(board, f"Pico race timer {VERSION}", 36.5, 80.3, 1.0)
-    for k, line in enumerate([f"pinewood-time {VERSION}", "github.com/no5tyle/pinewood-time",
-                              "lanes GP0-7  gate GP18  reset GP19", "LED GP20-22  I2C GP16/17"]):
-        text(board, line, 78.0, 70.4 + k * 1.6, 0.9, layer=pcbnew.B_SilkS)
+        text(board, name, 93.5 + k * 2.54, 26.55, 0.8)
+    for k, name in enumerate(["GND", "3V3", "5V", "26", "27", "28"]):
+        text(board, name, 105.0 + k * 2.54, 26.55, 0.8)
+    text(board, "100uF", 121.8, 20.0, 0.8)
+    # Title on the back
+    text(board, f"pinewood-time {VERSION}  Pico race timer  github.com/no5tyle/pinewood-time", 60.0, 2.6, 1.0,
+         layer=pcbnew.B_SilkS)
 
 
 def starved_pads(board):

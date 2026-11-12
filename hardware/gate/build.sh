@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 mkdir -p stl renders
-for p in left right pod lid mx_blank led_lens sensor_bar; do
+for p in left right cover mx_blank led_lens sensor_bar; do
   openscad -D "part=\"$p\"" -o "stl/$p.stl" finish-gate.scad
 done
 RUN=""
@@ -14,3 +14,5 @@ eval $RUN openscad -o renders/gate-front.png --imgsize=1600,1100 --colorscheme=T
 python3 section.py
 eval $RUN openscad -o renders/gate-underside.png -D "'part=\"underside\"'" --imgsize=1600,1000 --colorscheme=Tomorrow \
   --camera=148,60,-60,125,0,200,760 --projection=p finish-gate.scad
+eval $RUN openscad -o renders/board-in-beam.png -D "'part=\"inside\"'" --imgsize=1600,700 --colorscheme=Tomorrow \
+  --camera=205,-330,175,205,0,135 --projection=o finish-gate.scad

@@ -1,11 +1,11 @@
 // pinewood-time finish gate: a 3D-printable finish-line gantry that clamps onto the track, holds a break-beam
-// sensor over each lane, and houses the timer board in a pod on top.
+// sensor over each lane, and houses the timer board inside its beam, under a removable top cover.
 //
 // Sized for the 3-lane track in "Pinewood Derby Track Build" (rev 0.5): 296 mm wide, 9 mm plywood board,
 // 40 x 6 mm rails on the pattern 30 | 40 | 58 | 40 | 58 | 40 | 30 mm (lane centres 50, 148, 246 mm).
 //
 // Render one part with:  openscad -D 'part="left"' -o left.stl finish-gate.scad   (see build.sh)
-// part = "assembly" (preview only), "left", "right", "pod", "lid", "mx_blank", "led_lens", "sensor_bar"
+// part = "assembly" (preview only), "left", "right", "cover", "mx_blank", "led_lens", "sensor_bar"
 //
 // Axes: X across the track (0 = the board's left edge, looking down the track towards the finish),
 // Y along it (0 = the finish line, negative = up-track, towards the start), Z up (0 = the race surface,
@@ -42,7 +42,7 @@ wall = 3;
 bot_wall = 4;
 leg_w = 24;                       // the legs stand outside the board, clear of every lane
 edge_gap = 0.5;                   // clearance between each leg and the board edge
-split_x = 99;                     // the beam splits between lanes 1 and 2, under the pod
+split_x = 99;                     // the beam splits between lanes 1 and 2
 jaw_top = 8;                      // how far the top clamp jaw reaches onto the board (wheels run from 15)
 slot_h = board_t + 0.6;           // the clamp slot, a little over the board for plywood variation
 chq = 6;                          // chequer square
@@ -71,25 +71,23 @@ bore_d = 6;                       // the light's path up through the turret
 groove_y = [6, 12];               // the wiring groove under the bar, beside the sensors
 foot_z = bar_bot;                 // the legs reach down beside the bar
 
-// ------------------------------------------------------------------ The pod (the timer board)
-pcb = [112, 82, 1.6];
-pod_in = [140, 86];               // inside: the board plus a 14 mm cable gutter each side
-pod_wall = 3;
-pod_floor = 3;
-pod_h = 30;                       // floor to lid, inside: 6 mm standoffs, the board, 22 mm for its parts
-pod_x = track_w / 2;
-pod_out = [pod_in[0] + 2 * pod_wall, pod_in[1] + 2 * pod_wall];
-pod_z0 = beam_z1;
-pcb_z = pod_z0 + pod_floor + 6;   // underside of the board
-lid_z = pod_z0 + pod_floor + pod_h;
-lid_t = 3;
-// The board's corner holes and parts, in its own coordinates (x right, y down, origin top-left)
-pcb_holes = [[21, 78.5], [60, 78.5], [107.5, 78.5], [107.5, 30.5]];
-pcb_usb = [62.5, 0];              // the Pico's USB socket, on the board's top edge
-pcb_led = [84, 64];               // D1, the status light
-pcb_key = [62, 64];               // an empty patch of board for the MX switch to sit over
-function pod_xy(p) = [pod_x - pcb[0] / 2 + p[0], pcb[1] / 2 - p[1]];   // board -> gate coordinates
-pod_bolts = [[pod_x - 63, 15], [pod_x - 63, -15], [pod_x + 63, 15], [pod_x + 63, -15]];
+// ------------------------------------------------------------------ The timer board, in the beam
+// The long board (hardware/, 178 x 28 mm) lies in the right half of the beam on two ledges, its left end
+// screwed down, the Pico's end held by ribs under the top cover. The Pico's USB socket faces the right leg,
+// and the cable runs down inside it.
+pcb = [178, 28, 1.6];
+pcb_x0 = 106;                     // the board's left end
+pcb_z = beam_z0 + bot_wall + 4;   // its underside: 4 mm over the beam's floor, room for leads and cables
+// board coordinates (x along it, y down from its back edge, as in KiCad) to the gate's
+function pcb_xy(p) = [pcb_x0 + p[0], pcb[1] / 2 - p[1]];
+pcb_holes = [[3.5, 5.5], [3.5, 22.5]];  // M2.5
+pcb_led = [113.24, 15];           // D1, the status light
+pcb_key = [150, 14];              // the MX switch sits over the Pico, clear of the tall parts
+led_top = pcb_z + pcb[2] + 9.6;   // the top of D1
+cover_x = [104, 292];             // the opening in the beam's top, over the board (and the USB plug)
+cover_y = 14.5;                   // half its width
+cover_t = 3;                      // the cover's deck, on top of the beam
+join_bolts = [[95, 10], [95, -10]];   // M3 x 35, down through the joint (and the tongue)
 
 // ================================================================== Helpers
 module rbox(size, r) {            // a box with rounded vertical edges, from the origin
@@ -148,9 +146,9 @@ module beam() {
     difference() {
         union() {
             translate([x0, -beam_d / 2, beam_z0]) cube([x1 - x0, beam_d, beam_h]);
-            // two rows of chequers along the top of the front, and the lane numbers below them
+            // two rows of chequers along the top of the front, and FINISH below them
             translate([x0, -beam_d / 2, beam_z1 - 2 * chq - 1]) chequer(x1 - x0, 2 * chq);
-            for (i = [0 : len(lanes) - 1]) front_text(str(i + 1), 12, lanes[i], beam_z0 + 10);
+            front_text("FINISH", 12, track_w / 2, beam_z0 + 10);
         }
         // the cable run inside, from leg to leg
         translate([x0 + 3, -beam_d / 2 + wall, beam_z0 + bot_wall]) cube([x1 - x0 - 6, beam_d - 2 * wall, beam_h - bot_wall - wall]);
@@ -160,17 +158,52 @@ module beam() {
             translate([sen_hole_x(x), 0, beam_z0 - 1]) cylinder(d = 1.8, h = bot_wall + 0.5);
             translate([sen_x0(x) - 4, -3, beam_z0 - 1]) cube([4.5, 6, bot_wall + 2]);
         }
-        // bolts through the beam that hold the pod (and the two halves) together, and the cable holes
-        for (b = pod_bolts) translate([b[0], b[1], beam_z0 - 1]) cylinder(d = 3.4, h = beam_h + 2);
-        for (s = [-1, 1]) translate([pod_x + s * 63 - 5, -9, beam_z1 - wall - 1]) cube([10, 18, wall + 2]);
+        // the opening in the top for the board, under the cover
+        translate([cover_x[0], -cover_y, beam_z1 - wall - 1]) cube([cover_x[1] - cover_x[0], 2 * cover_y, wall + 2]);
+        // the bolts that hold the two halves together, through the joint, nuts underneath
+        join_holes();
+    }
+}
+
+// The cable run inside, from leg to leg (cut after the legs are added, so it runs through them too)
+module beam_cavity() {
+    translate([x0 + 3, -beam_d / 2 + wall, beam_z0 + bot_wall]) cube([x1 - x0 - 6, beam_d - 2 * wall, beam_h - bot_wall - wall]);
+}
+
+// Inside the beam: what the board and the cover fix to
+module beam_insides() {
+    // the board rests on a ledge along each side wall, and its left end screws to two bosses
+    for (sy = [-1, 1]) translate([pcb_x0, sy > 0 ? pcb[1] / 2 - 0.5 : -beam_d / 2 + wall - 0.01, beam_z0 + bot_wall - 0.01])
+        cube([pcb[0] + 4, beam_d / 2 - wall - pcb[1] / 2 + 0.51, pcb_z - beam_z0 - bot_wall + 0.01]);
+    for (h = pcb_holes) let(p = pcb_xy(h)) translate([p[0], p[1], beam_z0 + bot_wall - 0.01]) difference() {
+        cylinder(d = 6, h = pcb_z - beam_z0 - bot_wall + 0.01);
+        cylinder(d = 2.2, h = 10);
+    }
+    // a block across the beam at each end of the opening for the cover's screws (cables pass under them)
+    for (x = [cover_x[0] - 4, cover_x[1]]) translate([x, -beam_d / 2 + wall - 0.01, beam_z1 - wall - 9])
+        difference() {
+            cube([4, beam_d - 2 * wall + 0.02, 9.01]);
+            for (sy = [-1, 1]) translate([2, beam_d / 2 - wall + sy * 10, -1]) cylinder(d = 2.6, h = 11);
+        }
+}
+
+module join_holes() {
+    for (b = join_bolts) translate([b[0], b[1], beam_z0 - 1]) {
+        cylinder(d = 3.4, h = beam_h + 2);
+        translate([0, 0, 0.99]) cylinder(d = 6.4, h = 2.6, $fn = 6);
     }
 }
 
 // A small pod under the beam over each lane, holding a receiver flat, LED looking down at the track
 pod_s = sen[2] + 0.5;             // how far the pods hang below the beam
 module sensor_pods() {
-    for (x = lanes) difference() {
-        translate([sen_x0(x) - 2.5, -sen[1] / 2 - 2.5, beam_z0 - pod_s]) rbox([sen[0] + 5, sen[1] + 5, pod_s + 0.01], 2);
+    for (i = [0 : len(lanes) - 1]) let(x = lanes[i]) difference() {
+        union() {
+            translate([sen_x0(x) - 2.5, -sen[1] / 2 - 2.5, beam_z0 - pod_s]) rbox([sen[0] + 5, sen[1] + 5, pod_s + 0.01], 2);
+            // its lane number on the front
+            translate([sen_x0(x) + sen[0] / 2, -sen[1] / 2 - 2.5 + 0.01, beam_z0 - pod_s / 2]) rotate([90, 0, 0])
+                linear_extrude(relief) text(str(i + 1), size = 6, font = "Liberation Sans:style=Bold", halign = "center", valign = "center");
+        }
         translate([0, 0, beam_z0 - pod_s]) flat_pocket(x, pod_s - 0.2);
         translate([sen_hole_x(x), 0, beam_z0 - pod_s - 1]) cylinder(d = 1.8, h = pod_s + bot_wall);
         // the cable leaves the sensor's end: out through the pod's end wall and up into the beam
@@ -190,14 +223,18 @@ module mirror_side(side) {
 }
 
 // cable channel up each leg into the beam, with a way in at the back just under the board (for the
-// receivers' cables, and the sensor bar's lead)
+// sensor bar's lead and the gate switch's cable on the left, and the USB cable on the right: 13 x 12 mm,
+// so a USB-A plug goes through)
 module leg_channels() {
     for (cx = [x0 + 8.5, x1 - 8.5]) {
-        translate([cx - 5.5, -6, -8]) cube([11, 12, beam_z0 + bot_wall + 14]);
-        translate([cx - 5.5, 0, -8]) cube([11, beam_d, 9]);
+        translate([cx - 6.5, -6, -8]) cube([13, 12, beam_z0 + bot_wall + 14]);
+        translate([cx - 6.5, 0, -8]) cube([13, beam_d, 9]);
     }
 }
-module gantry() { difference() { union() { leg(-1); leg(1); beam(); sensor_pods(); } leg_channels(); } }
+module gantry() {
+    difference() { union() { leg(-1); leg(1); beam(); sensor_pods(); } beam_cavity(); leg_channels(); }
+    beam_insides();
+}
 
 // The two printed halves. The right half carries a hollow tongue that slides 8 mm into the left half's
 // beam; a collar filling the end of the right half's beam holds it, and cables pass through both
@@ -211,6 +248,7 @@ module tongue() {
             translate([split_x - 8, -cav[0] / 2 + t, z + t]) cube([8.01, cav[0] - 2 * t, cav[1] - 2 * t]);
         }
         translate([split_x - 9, -cav[0] / 2 + t + 2, z + t + 2]) cube([20, cav[0] - 2 * t - 4, cav[1] - 2 * t - 4]);
+        join_holes();
     }
 }
 module left_half() { intersection() { gantry(); translate([x0 - 5, -100, -100]) cube([split_x - x0 + 5, 200, 400]); } }
@@ -221,76 +259,39 @@ module right_half() {
     }
 }
 
-// ================================================================== The pod
-module pod() {
-    ox = pod_x - pod_out[0] / 2;
-    oy = -pod_out[1] / 2;
-    difference() {
-        union() {
-            translate([ox, oy, pod_z0]) rbox([pod_out[0], pod_out[1], pod_floor + pod_h], 6);
-            // FINISH on the front, with a chequered band either side
-            translate([pod_x, oy + 0.01, pod_z0 + 18]) rotate([90, 0, 0])
-                linear_extrude(relief) text("FINISH", size = 13, font = "Liberation Sans:style=Bold", halign = "center", valign = "center");
-            for (s = [-1, 1]) translate([pod_x + s * 52 - 12, oy, pod_z0 + 6]) chequer(24, 24, s < 0 ? 0 : 1);
-        }
-        // inside
-        translate([ox + pod_wall, oy + pod_wall, pod_z0 + pod_floor]) rbox([pod_in[0], pod_in[1], pod_h + 1], 3);
-        // the Pico's USB socket, through the back wall (tall enough for a Pico on headers or soldered flat)
-        u = pod_xy(pcb_usb);
-        translate([u[0] - 7, pod_out[1] / 2 - pod_wall - 1, pcb_z + pcb[2] - 0.5]) cube([14, pod_wall + 2, 18]);
-        // bolts down through the beam, and the cable holes into it, in the gutters
-        for (b = pod_bolts) translate([b[0], b[1], pod_z0 - 1]) cylinder(d = 3.4, h = pod_floor + 2);
-        for (s = [-1, 1]) translate([pod_x + s * 63 - 5, -9, pod_z0 - 1]) cube([10, 18, pod_floor + 2]);
-        // a cable gland at each end for the gate and reset leads (and USB, if you'd rather it came out the side)
-        for (s = [-1, 1]) translate([pod_x + s * (pod_out[0] / 2), 25, pod_z0 + pod_floor + 8]) rotate([0, 90, 0]) cylinder(d = 7, h = 10, center = true);
-    }
-    // board standoffs (M3 self-tapping screws, 6 mm)
-    for (h = pcb_holes) let(p = pod_xy(h)) translate([p[0], p[1], pod_z0 + pod_floor - 0.01]) difference() {
-        cylinder(d = 7, h = 6);
-        cylinder(d = 2.6, h = 7);
-    }
-    // lid screw posts in the corners
-    for (sx = [-1, 1], sy = [-1, 1]) translate([pod_x + sx * 64, sy * 37, pod_z0 + pod_floor - 0.01]) difference() {
-        cylinder(d = 7, h = pod_h);
-        cylinder(d = 2.6, h = pod_h + 1);
-    }
-}
-
+// ================================================================== The cover
 // MX switch: a 14 mm square hole in a 1.5 mm plate (the switch clips into it)
 mx_hole = 14;
 mx_plate = 1.5;
-module lid() {
-    ox = pod_x - pod_out[0] / 2;
-    oy = -pod_out[1] / 2;
-    k = pod_xy(pcb_key);
-    l = pod_xy(pcb_led);
+module cover() {
+    k = pcb_xy(pcb_key);
+    l = pcb_xy(pcb_led);
+    top = beam_z1 + cover_t;
     difference() {
         union() {
-            translate([ox, oy, lid_z]) rbox([pod_out[0], pod_out[1], lid_t], 6);
-            // a lip that locates the lid inside the walls
-            translate([ox + pod_wall + 0.3, oy + pod_wall + 0.3, lid_z - 2]) difference() {
-                rbox([pod_in[0] - 0.6, pod_in[1] - 0.6, 2.01], 3);
-                translate([1.6, 1.6, -1]) rbox([pod_in[0] - 3.8, pod_in[1] - 3.8, 4], 2);
-            }
-            // a light pipe down towards the status LED
-            translate([l[0], l[1], lid_z - 12]) cylinder(d = 8, h = 12.01);
+            // the deck, on top of the beam, and a plug that fills the opening
+            translate([cover_x[0] - 4, -beam_d / 2, beam_z1]) rbox([cover_x[1] - cover_x[0] + 8, beam_d, cover_t], 2);
+            translate([cover_x[0] + 0.3, -cover_y + 0.3, beam_z1 - wall]) cube([cover_x[1] - cover_x[0] - 0.6, 2 * cover_y - 0.6, wall + 0.01]);
+            // ribs that hold the Pico's end of the board down by its edges (clear of the Pico itself)
+            for (y = [11, -13.5]) translate([pcb_x0 + 140, y, pcb_z + pcb[2] + 0.2]) cube([30, 2.5, beam_z1 - wall - pcb_z - pcb[2] - 0.2 + 0.01]);
+            // a light pipe down to the status LED
+            translate([l[0], l[1], led_top + 1]) cylinder(d = 8, h = beam_z1 - wall - led_top - 1 + 0.01);
         }
-        // corner screws, countersunk
-        for (sx = [-1, 1], sy = [-1, 1]) translate([pod_x + sx * 64, sy * 37, lid_z - 3]) {
+        // screws into the blocks at each end, countersunk
+        for (x = [cover_x[0] - 2, cover_x[1] + 2], sy = [-1, 1]) translate([x, sy * 10, beam_z1 - 1]) {
             cylinder(d = 3.4, h = 10);
-            translate([0, 0, 3 + lid_t - 1.8]) cylinder(d1 = 3.4, d2 = 6.6, h = 1.81);
+            translate([0, 0, 1 + cover_t - 1.8]) cylinder(d1 = 3.4, d2 = 6.6, h = 1.81);
         }
-        // the MX switch: plate 1.5 mm thick here, and room underneath for its housing
-        translate([k[0] - mx_hole / 2, k[1] - mx_hole / 2, lid_z - 1]) cube([mx_hole, mx_hole, lid_t + 2]);
-        translate([k[0] - 8, k[1] - 8, lid_z - 2.01]) cube([16, 16, 2 + lid_t - mx_plate]);
-        // status LED window
-        translate([l[0], l[1], lid_z - 13]) cylinder(d = 5.3, h = 20);
-        // name, engraved
-        translate([pod_x, 26, lid_z + lid_t - 0.6]) linear_extrude(1)
-            text("pinewood-time", size = 7, font = "Liberation Sans:style=Bold", halign = "center", valign = "center");
-        // chequered strip along the front edge, engraved
-        for (i = [0 : 19], j = [0 : 1]) if ((i + j) % 2 == 0)
-            translate([pod_x - 60 + i * 6 + 0.1, oy + 6 + j * 6 + 0.1, lid_z + lid_t - 0.6]) cube([5.8, 5.8, 1]);
+        // the MX switch: the deck is 1.5 mm thick here, with room underneath for the switch's housing
+        translate([k[0] - mx_hole / 2, k[1] - mx_hole / 2, beam_z1 - wall - 1]) cube([mx_hole, mx_hole, wall + cover_t + 2]);
+        translate([k[0] - 8, k[1] - 8, beam_z1 - wall - 0.01]) cube([16, 16, wall + cover_t - mx_plate]);
+        // the status light's window (the lens pushes in)
+        translate([l[0], l[1], led_top]) cylinder(d = 5.3, h = 40);
+        // chequers along the deck, and the name, engraved
+        for (i = [0 : 31], j = [0 : 1]) if ((i + j) % 2 == 0)
+            translate([cover_x[0] + 2 + i * 6 + 0.1, -beam_d / 2 + 2 + j * 6 + 0.1, top - 0.6]) cube([5.8, 5.8, 1]);
+        translate([cover_x[0] + 50, 10, top - 0.6]) linear_extrude(1)
+            text("pinewood-time", size = 6, font = "Liberation Sans:style=Bold", halign = "center", valign = "center");
     }
 }
 
@@ -303,7 +304,7 @@ module mx_blank() {
     }
 }
 
-// Status light lens: print in white or clear; pushes into the lid's LED window
+// Status light lens: print in white or clear; pushes into the cover's LED window
 module led_lens() {
     union() {
         cylinder(d = 5.1, h = 6);
@@ -363,19 +364,16 @@ if (part == "assembly") {
     track_preview();
     color("Gold") left_half();
     color("Orange") right_half();
-    color("DimGray") pod();
-    color("Gray") lid();
-    color("Black") { k = pod_xy(pcb_key); translate([k[0], k[1], lid_z + lid_t]) translate([-9, -9, 0]) cube([18, 18, 8]); }
-    color("White") { l = pod_xy(pcb_led); translate([l[0], l[1], lid_z + lid_t - 7]) led_lens(); }
-    color("DarkGreen") { p = pod_xy([0, 0]); translate([p[0], p[1] - pcb[1], pcb_z]) cube(pcb); }
+    color("DimGray") cover();
+    color("Black") { k = pcb_xy(pcb_key); translate([k[0] - 9, k[1] - 9, beam_z1 + cover_t]) cube([18, 18, 8]); }
+    color("White") { l = pcb_xy(pcb_led); translate([l[0], l[1], beam_z1 + cover_t - 7]) led_lens(); }
     color("Orange") sensor_bar();
 }
-// Print orientations: the gantry halves lie on their backs, chequers up; the pod stands on its floor;
-// the lid prints upside down (top on the bed)
+// Print orientations: the gantry halves lie on their backs, chequers up; the cover prints upside down
+// (its deck on the bed)
 if (part == "left") rotate([-90, 0, 0]) translate([0, -beam_d / 2, 0]) left_half();
 if (part == "right") rotate([-90, 0, 0]) translate([0, -beam_d / 2, 0]) right_half();
-if (part == "pod") translate([0, 0, -pod_z0]) pod();
-if (part == "lid") rotate([180, 0, 0]) translate([0, 0, -lid_z - lid_t]) lid();
+if (part == "cover") rotate([180, 0, 0]) translate([0, 0, -beam_z1 - cover_t]) cover();
 if (part == "mx_blank") rotate([180, 0, 0]) mx_blank();
 if (part == "led_lens") led_lens();
 // the bar prints standing on its underside; at 306 mm long, lay it diagonally on a 256 mm bed
@@ -388,4 +386,13 @@ if (part == "underside") {
     color("Gold") left_half();
     color("Orange") right_half();
     color("OrangeRed") sensor_bar();
+}
+
+// The right half with its front wall cut away, the board on its ledges and the cover on top
+if (part == "inside") {
+    color("Orange") intersection() { right_half(); translate([90, -beam_d / 2 + wall + 0.5, 100]) cube([240, 40, 80]); }
+    color("DimGray", 0.5) cover();
+    color("DarkGreen") { p = pcb_xy([0, 0]); translate([p[0], p[1] - pcb[1], pcb_z]) cube(pcb); }
+    color("Black") { p = pcb_xy([126, 3.5]); translate([p[0], p[1] - 21, pcb_z + pcb[2] + 2.5]) cube([51.5, 21, 1]); }
+    color("Silver") { p = pcb_xy([178, 14]); translate([p[0] + 1.3, p[1] - 4, pcb_z + pcb[2] + 4]) cube([18, 8, 4]); }
 }
