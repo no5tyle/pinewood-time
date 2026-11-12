@@ -23,6 +23,7 @@ everything a timer needs, and the firmware for it.
 | [`hardware/fab/pinewood-time-gerbers.zip`](hardware/fab/pinewood-time-gerbers.zip) | Gerbers and drill files: upload this to a board maker |
 | [`hardware/fab/bom.md`](hardware/fab/bom.md) | Parts list (also [`bom.csv`](hardware/fab/bom.csv)) |
 | [`docs/wiring.md`](docs/wiring.md) | Wiring the sensors, gate, button and displays |
+| [`docs/kit-3-lane.md`](docs/kit-3-lane.md) | A 3-lane kit: shopping list (Australia), what to solder, wiring, setup |
 | [`docs/protocol.md`](docs/protocol.md) | The serial protocol and settings commands |
 | [`docs/schematic.svg`](docs/schematic.svg) | The circuit |
 | [`firmware/`](firmware) | Firmware source (C, Pico SDK) and host tests |
