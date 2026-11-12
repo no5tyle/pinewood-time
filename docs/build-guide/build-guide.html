@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>pinewood-time build guide</title>
+<style>
+  :root {
+    --ink: #1d2530; --muted: #5d6875; --line: #dde2e6; --panel: #f5f7f8; --accent: #1f7a45; --warn: #9a5b00;
+  }
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Liberation Sans", "DejaVu Sans", Arial, sans-serif; color: var(--ink); font-size: 10pt; line-height: 1.45; margin: 0; background: #fff; }
+  h1 { font-size: 26pt; margin: 0 0 4mm; letter-spacing: -0.5px; }
+  h2 { font-size: 16pt; margin: 0 0 3mm; padding-bottom: 1.5mm; border-bottom: 2px solid var(--accent); break-after: avoid; }
+  h3 { font-size: 11.5pt; margin: 5mm 0 2mm; break-after: avoid; }
+  p { margin: 0 0 2.5mm; }
+  ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1.2mm; }
+  section { break-before: page; }
+  table { width: 100%; border-collapse: collapse; margin: 1mm 0 4mm; font-size: 9pt; break-inside: auto; }
+  th, td { text-align: left; vertical-align: top; padding: 1.1mm 2mm; border-bottom: 1px solid var(--line); }
+  th { background: var(--panel); font-weight: 700; }
+  tr { break-inside: avoid; }
+  td.n { white-space: nowrap; }
+  code { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 8.8pt; background: var(--panel); padding: 0.2mm 1mm; border-radius: 2px; }
+  pre { font-family: "DejaVu Sans Mono", monospace; font-size: 8.8pt; background: var(--panel); padding: 2.5mm 3mm; border-radius: 3px; margin: 0 0 3mm; }
+  figure { margin: 2mm 0 4mm; break-inside: avoid; text-align: center; }
+  figure img { max-width: 100%; border: 1px solid var(--line); border-radius: 3px; }
+  figcaption { font-size: 8.5pt; color: var(--muted); margin-top: 1.5mm; }
+  .note { border-left: 3px solid var(--accent); background: #eef6f1; padding: 2.5mm 3.5mm; margin: 2mm 0 4mm; break-inside: avoid; }
+  .warn { border-left: 3px solid var(--warn); background: #fbf3e6; padding: 2.5mm 3.5mm; margin: 2mm 0 4mm; break-inside: avoid; }
+  .muted { color: var(--muted); }
+  .cover { text-align: left; padding-top: 8mm; }
+  .cover .sub { font-size: 13pt; color: var(--muted); margin-bottom: 10mm; }
+  .cover img { width: 100%; max-height: 110mm; object-fit: contain; border: 1px solid var(--line); border-radius: 4px; }
+  .toc { columns: 2; column-gap: 10mm; margin-top: 10mm; font-size: 10pt; }
+  .toc div { break-inside: avoid; padding: 0.8mm 0; border-bottom: 1px dotted var(--line); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  .check { list-style: none; padding-left: 0; }
+  .check li::before { content: "\2610"; margin-right: 2mm; }
+  .step { counter-increment: step; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>pinewood-time</h1>
+  <div class="sub">A Raspberry Pi Pico race timer in a 3D-printed finish gate<br>Build guide: board, gate and final assembly, for the 3-lane track</div>
+  <img src="../../hardware/gate/renders/gate-front.png" alt="The finish gate on the track">
+  <div class="toc">
+    <div>1. What you're building</div>
+    <div>2. Parts: Core Electronics</div>
+    <div>3. Parts: AliExpress alternative</div>
+    <div>4. Ordering the circuit board</div>
+    <div>5. Flashing the firmware</div>
+    <div>6. Soldering the board</div>
+    <div>7. Printing the gate</div>
+    <div>8. Modifying the track</div>
+    <div>9. Final assembly</div>
+    <div>10. Setting up and testing</div>
+    <div>11. Troubleshooting</div>
+  </div>
+  <p class="muted" style="margin-top:8mm">github.com/no5tyle/pinewood-time · board v1.1 · firmware 1.1.0 · November 2026.
+  The board and gate pass their design checks, but no complete timer has been built and raced yet:
+  treat your first build as the test, and report what you find.</p>
+</div>
+
+<section>
+  <h2>1. What you're building</h2>
+  <p>A finish-line gantry that clamps onto the end of the track. A break-beam sensor watches each lane: an
+  infrared emitter set into the rail shines up to a receiver in the gantry above, and a car crossing the line
+  breaks the beam. The timer board inside the gantry's beam stamps each lane's crossing with the Pico's
+  microsecond clock, counted from the moment the start gate drops, and sends the results to the race software
+  over USB.</p>
+  <ul>
+    <li><b>Timing:</b> up to 8 lanes (this guide fits 3), results to 0.0001 s.</li>
+    <li><b>Race software:</b> speaks the PDT timer's serial protocol, so software with a PDT option should drive it.</li>
+    <li><b>Button:</b> an MX keyboard switch on top resets the timer, or (with <code>#button next</code>) calls up the next heat.</li>
+    <li><b>Status light:</b> amber blinking = waiting, green = ready, blue = racing, red = finished, white = test mode.</li>
+    <li><b>Connection:</b> one USB-C socket on the side of the gate; it's powered from the laptop.</li>
+  </ul>
+  <figure><img src="../../hardware/renders/pcb-front.png" style="width:100%"><figcaption>The timer board, 178 × 28 mm. Lanes 1–8 on the left, then the gate, reset, display and spare connectors, the status light, and the Pico at the right-hand end.</figcaption></figure>
+  <figure><img src="../schematic.svg" style="width:82%"><figcaption>The circuit. Every input is pulled up to 3.3 V and reaches the Pico through a 1k resistor, so anything that switches to ground works.</figcaption></figure>
+  <h3>Tools</h3>
+  <ul>
+    <li>Soldering iron (a fine conical or 2 mm chisel tip), solder, side cutters</li>
+    <li>JST XH crimp tool (or solder the wires to pre-crimped leads), wire strippers</li>
+    <li>3D printer with a bed of at least 256 × 256 mm (the sensor bar lies diagonally)</li>
+    <li>Drill with a 10 mm bit and a small pilot bit, screwdrivers, M3 and M4 hex keys or spanners</li>
+    <li>A computer with a serial terminal (the Arduino IDE's serial monitor, PuTTY, or <code>screen</code>)</li>
+  </ul>
+</section>
+
+<section>
+  <h2>2. Parts: Core Electronics</h2>
+  <p>Everything for one 3-lane timer except the boards (JLCPCB, section 4) and the fasteners. Prices are rough,
+  in Australian dollars with GST, from November 2026; check the listings before ordering.</p>
+  <table>
+    <tr><th>Qty</th><th>Item</th><th>For</th><th>About</th></tr>
+    <tr><td class="n">1</td><td>Raspberry Pi Pico (or Pico H; solder it flat or on 2.5 mm headers)</td><td>U1</td><td>$8–10</td></tr>
+    <tr><td class="n">3</td><td>Adafruit IR break-beam sensor, 3 mm LEDs (ADA2167)</td><td>one pair per lane</td><td>$6.20 each</td></tr>
+    <tr><td class="n">1</td><td>SparkFun resistor kit, 1/4 W, 500 pcs (COM-10969)</td><td>5 × 10k, 5 × 1k, 3 × 220 Ω</td><td>$15</td></tr>
+    <tr><td class="n">1</td><td>DFRobot JST connector kit (FIT0255)</td><td>lane, gate and reset sockets, plugs, crimps</td><td>$14</td></tr>
+    <tr><td class="n">1</td><td>100 µF radial electrolytic, 6.3 mm, 2.5 mm leg spacing (CE05258)</td><td>C1</td><td>$1</td></tr>
+    <tr><td class="n">1</td><td>100 nF ceramic disc, 5 mm leg spacing (CE05188)</td><td>C2</td><td>$0.40</td></tr>
+    <tr><td class="n">1</td><td>SparkFun RGB LED, 5 mm, common cathode (COM-09264)</td><td>D1, status light</td><td>$3.85</td></tr>
+    <tr><td class="n">1</td><td>2.54 mm male header strip</td><td>J12 (1 × 6), and J11 if you fit displays</td><td>$1</td></tr>
+    <tr><td class="n">1</td><td>MX keyboard switch and a 1u keycap (any)</td><td>the button</td><td>$3</td></tr>
+    <tr><td class="n">1</td><td>Adafruit panel-mount USB-C to Micro-B cable, 30 cm (ADA4056)</td><td>USB-C socket on the gate</td><td>$10.60</td></tr>
+    <tr><td class="n">1</td><td>Lever microswitch</td><td>start gate</td><td>$2</td></tr>
+    <tr><td class="n">1</td><td>USB-C data cable (not charge-only)</td><td>gate to laptop</td><td>$8</td></tr>
+    <tr><td class="n">~12 m</td><td>2-core cable (alarm or speaker wire)</td><td>start gate switch, about 10 m</td><td>$6</td></tr>
+  </table>
+  <p><b>About A$100</b> for the parts, plus the boards and fasteners. The resistor and connector kits leave plenty for more boards.</p>
+  <h3>Fasteners (any hardware store, or an assortment kit)</h3>
+  <table>
+    <tr><th>Qty</th><th>Item</th><th>For</th></tr>
+    <tr><td class="n">2</td><td>M3 × 35 bolts and nuts</td><td>joining the two gate halves</td></tr>
+    <tr><td class="n">2</td><td>M3 × 40 bolts and nuts</td><td>lock pins through the legs and the sensor bar</td></tr>
+    <tr><td class="n">4</td><td>M3 × 12 countersunk self-tapping screws</td><td>the top cover</td></tr>
+    <tr><td class="n">2</td><td>M4 × 16 bolts and nuts</td><td>thumbscrews that clamp the gate to the track</td></tr>
+    <tr><td class="n">2</td><td>M2.5 × 6 self-tapping screws</td><td>the board's left end</td></tr>
+    <tr><td class="n">6</td><td>M2 × 10 self-tapping screws</td><td>one through each sensor's mounting hole</td></tr>
+  </table>
+  <div class="note"><b>Not needed for 3 lanes:</b> the 180 Ω resistors (R1–R8) only power bare IR LEDs, and the 4.7k
+  resistors (R35, R36) and J11 are only for lane displays. The full 8-lane parts list is in <code>hardware/fab/bom.md</code>.</div>
+</section>
+
+<section>
+  <h2>3. Parts: AliExpress alternative</h2>
+  <p>Cheaper, slower (2–4 weeks), and you choose the seller, so check each listing's photos and dimensions. These
+  are search terms rather than links, because listings come and go. The prices are typical figures for
+  small packs, not quotes. Check them on the day.</p>
+  <table>
+    <tr><th>Qty</th><th>Search for</th><th>Check</th><th>Typical</th></tr>
+    <tr><td class="n">1</td><td>"Raspberry Pi Pico RP2040" (official, from a store selling genuine boards)</td><td>Pico, or Pico 2 for the RP2350 build. Clones work if they're pin-compatible, but buy one marked Raspberry Pi if you can.</td><td>A$6–9</td></tr>
+    <tr><td class="n">1</td><td>"1/4W metal film resistor kit 600pcs"</td><td>Includes 10k, 1k, 220 Ω (and 4.7k).</td><td>A$3–5</td></tr>
+    <tr><td class="n">1</td><td>"XH2.54 connector kit 2P 3P 4P" with straight pin headers</td><td>Must say XH. KF2510 kits look alike but don't fit XH sockets.</td><td>A$4–7</td></tr>
+    <tr><td class="n">1</td><td>"electrolytic capacitor 100uF 16V 6.3x11" (or an assortment)</td><td>6.3 mm diameter, 2.5 mm leg spacing.</td><td>A$2</td></tr>
+    <tr><td class="n">1</td><td>"ceramic capacitor 104 100nF 50V" (5 mm leg spacing)</td><td>Disc or multilayer, 5 mm pitch.</td><td>A$1–2</td></tr>
+    <tr><td class="n">1</td><td>"5mm RGB LED common cathode 4 pin"</td><td>Common <b>cathode</b>, legs in the order R, K, G, B (K the longest).</td><td>A$1–2</td></tr>
+    <tr><td class="n">1</td><td>"2.54mm single row male pin header 40P"</td><td></td><td>A$1</td></tr>
+    <tr><td class="n">1</td><td>"MX switch" (Gateron, Outemu, Kailh) and "1u keycap"</td><td>3-pin or 5-pin MX switch; plate-mount clips are what hold it in the cover.</td><td>A$3–6</td></tr>
+    <tr><td class="n">1</td><td>"panel mount USB type C female to micro USB male screw"</td><td>Must match the Adafruit one: 28 × 8.5 mm flange, M3 screws 20 mm apart, body 13 mm thick, about 40 mm long. Or adjust <code>usb_cut</code> in the model.</td><td>A$3–6</td></tr>
+    <tr><td class="n">1</td><td>"micro switch lever KW11" (or similar)</td><td>Normally-closed contact (C and NC terminals).</td><td>A$1–2</td></tr>
+    <tr><td class="n">1</td><td>"M2 M3 M4 screw nut assortment kit" (and M2.5 self-tappers)</td><td>See the fastener table on the previous page.</td><td>A$6–10</td></tr>
+  </table>
+  <div class="warn"><b>Buy the sensors from Core Electronics (or Adafruit).</b> The gate's pockets fit the Adafruit
+  sensor's Omron housing exactly: 20 × 10 × 8 mm, LED on the broad face 5 mm from one end, 2.4 mm mounting hole
+  10 mm from the LED. Generic "IR break beam" pairs on AliExpress come in many housings and outputs. If you do buy
+  them there, check the housing against those numbers, and that the receiver has an open-collector (NPN) output
+  that goes low while it sees the beam.</div>
+  <p>A mixed order (sensors from Core, the rest from AliExpress) comes to roughly <b>A$50–60</b> plus the boards.</p>
+</section>
+
+<section>
+  <h2>4. Ordering the circuit board</h2>
+  <p>The board is ordered as Gerber files: one zip, <code>hardware/fab/pinewood-time-gerbers.zip</code>, from the
+  repository. JLCPCB is described here; PCBWay and others take the same zip.</p>
+  <ol>
+    <li>Go to jlcpcb.com and choose <b>Order now</b>, then <b>Add gerber file</b>, and upload the zip. It reads the size
+      itself: it should show <b>178 × 28 mm</b>, 2 layers.</li>
+    <li>Settings: base material FR-4, 2 layers, quantity 5 (the minimum), thickness 1.6 mm, any colour,
+      surface finish HASL (with lead or lead-free). Leave everything else at the default.</li>
+    <li>Check the preview: lane numbers 1–8 along one side, the Pico's outline at the right-hand end, and
+      "pinewood-time v1.1" on the back.</li>
+    <li>Don't add assembly (it's all through-hole and quick to solder). Choose shipping and order.</li>
+  </ol>
+  <p class="muted">Expect about US$5–10 for five boards plus shipping, arriving in one to two weeks.</p>
+  <figure><img src="../../hardware/renders/pcb-back.png" style="width:100%"><figcaption>The back of the board.</figcaption></figure>
+</section>
+
+<section>
+  <h2>5. Flashing the firmware</h2>
+  <p>Do this before soldering the Pico in, so you know it works.</p>
+  <ol>
+    <li>Download <code>dist/pinewood-time-pico.uf2</code> from the repository (or <code>pinewood-time-pico2.uf2</code> for a Pico 2).</li>
+    <li>Hold the Pico's <b>BOOTSEL</b> button while plugging it into the computer. It appears as a drive called RPI-RP2 (RP2350 for a Pico 2).</li>
+    <li>Copy the <code>.uf2</code> file onto it. The drive disappears and the Pico restarts as the timer.</li>
+    <li>Open the new serial port in a terminal (COM<i>n</i> on Windows, <code>/dev/ttyACM0</code> on Linux, <code>/dev/cu.usbmodem…</code> on a Mac; any baud rate). Send <code>I</code>: it replies with its version and settings.</li>
+  </ol>
+  <p>To update it later, either repeat this, or open the port at 1200 baud, which restarts the Pico ready for new firmware.</p>
+</section>
+
+<section>
+  <h2>6. Soldering the board</h2>
+  <p>For 3 lanes, fit these and leave the rest empty. Empty places do no harm, and can be filled later for more lanes.</p>
+  <div class="two">
+  <table>
+    <tr><th>Fit</th><th>Value</th></tr>
+    <tr><td>R11, R12, R13</td><td>10k (lane pull-ups)</td></tr>
+    <tr><td>R21, R22, R23</td><td>1k (lane series)</td></tr>
+    <tr><td>R31, R33</td><td>10k (gate, reset)</td></tr>
+    <tr><td>R32, R34</td><td>1k (gate, reset)</td></tr>
+    <tr><td>R37, R38, R39</td><td>220 Ω (status light)</td></tr>
+    <tr><td>C1, C2</td><td>100 µF, 100 nF</td></tr>
+    <tr><td>D1</td><td>RGB LED</td></tr>
+    <tr><td>J1, J2, J3</td><td>4-pin JST XH (lanes 1–3)</td></tr>
+    <tr><td>J9, J10</td><td>2-pin JST XH (gate, reset)</td></tr>
+    <tr><td>J12</td><td>1 × 6 header (emitter power)</td></tr>
+    <tr><td>U1</td><td>Pico</td></tr>
+  </table>
+  <table>
+    <tr><th>Leave empty</th><th>Why</th></tr>
+    <tr><td>R1–R8</td><td>only for bare IR LEDs</td></tr>
+    <tr><td>R14–R18, R24–R28, J4–J8</td><td>lanes 4–8</td></tr>
+    <tr><td>R35, R36, J11</td><td>lane displays (optional)</td></tr>
+  </table>
+  </div>
+  <h3>Order</h3>
+  <ol>
+    <li><b>C2</b> (100 nF), at the top beside the Pico. Either way round.</li>
+    <li><b>Resistors.</b> They stand upright, three to a lane, with their values printed above them. Bend one lead
+      down alongside the body, put the body into the hole inside the circle, solder, and trim. Either way round.</li>
+    <li><b>D1</b>, the status light. Its longest leg (the common cathode, K) goes in the second hole from the left.
+      Solder it with its base about 1 mm off the board.</li>
+    <li><b>C1</b>, 100 µF: the long leg (+) to the square pad.</li>
+    <li><b>J12</b> header, and the <b>JST sockets</b>, turned to match their outlines.</li>
+    <li><b>The Pico</b>, last, at the right-hand end with its USB socket just past the end of the board. In the gate there's 20 mm above the board, so solder it <b>flat</b> on its castellated edges, or on <b>short (2.5 mm) headers</b>, not tall sockets.</li>
+  </ol>
+  <div class="note"><b>Check:</b> plug it in. The status light should blink amber. Send <code>#lanes 3</code> then <code>#save</code>.</div>
+</section>
+
+<section>
+  <h2>7. Printing the gate</h2>
+  <p>The files are in <code>hardware/gate/stl/</code>. All print without supports at 0.2 mm layers in PLA or PETG,
+  3 walls, 15–20% infill: about 400 g of filament in all.</p>
+  <table>
+    <tr><th>File</th><th>Qty</th><th>Size on the bed</th><th>Orientation</th></tr>
+    <tr><td><code>left.stl</code></td><td>1</td><td>124 × 185 mm</td><td>lying on its back, chequers up (as exported)</td></tr>
+    <tr><td><code>right.stl</code></td><td>1</td><td>230 × 185 mm</td><td>lying on its back, chequers up</td></tr>
+    <tr><td><code>sensor_bar.stl</code></td><td>1</td><td>307 × 30 mm</td><td>underside down; rotate 45° to lie diagonally on a 256 × 256 mm bed</td></tr>
+    <tr><td><code>cover.stl</code></td><td>1</td><td>196 × 40 mm</td><td>deck face down (as exported)</td></tr>
+    <tr><td><code>led_lens.stl</code></td><td>1</td><td>tiny</td><td>print in white or clear</td></tr>
+    <tr><td><code>mx_blank.stl</code></td><td>1</td><td>tiny</td><td>only if you're not fitting a key</td></tr>
+  </table>
+  <p><b>Two colours:</b> the chequers and FINISH on the gate halves are raised 0.8 mm. Pause and change filament
+  at 40.0 mm (the last 0.8 mm) for a two-colour gantry.</p>
+  <p><b>After printing:</b> clear any strings from the sensor pockets and the dovetail sockets in the feet of the legs, and check an M3 nut drops into each hex pocket.</p>
+  <figure><img src="../../hardware/gate/renders/gate-underside.png" style="width:85%"><figcaption>From underneath: the sensor bar runs under the track and dovetails into both legs.</figcaption></figure>
+</section>
+
+<section>
+  <h2>8. Modifying the track</h2>
+  <p>On Track E, the last section. The holes are the only change; nothing is screwed to the track, so the gate lifts off for packing.</p>
+  <ol>
+    <li>Mark the finish line square across the board, <b>200 mm from the tail end</b>. That keeps it clear of the tail support (42–84 mm from the end) and its screws.</li>
+    <li>Where the line crosses each rail centre line, <b>50, 148 and 246 mm</b> from the left edge, drill a <b>10 mm hole</b> through the rail and the board.
+      Drill a pilot right through, then the 10 mm bit a few millimetres in from the underside, then finish from the top, so neither face splinters.</li>
+  </ol>
+  <p>That leaves 15 mm of rail either side of each hole, so the rail still guides the wheels. The sensor bar's turrets come up into the holes and stop 1 mm below the rail top.</p>
+  <figure><img src="../../hardware/gate/renders/sensor-fit.svg" style="width:100%"><figcaption>A cut across lane 2 at the finish line, to scale: the emitter lies flat in the sensor bar under the board and looks up through its turret.</figcaption></figure>
+  <div class="warn">The track has no stopping area after the finish. Plan something to catch the cars: a towel, or a padded board across the end.</div>
+</section>
+
+<section>
+  <h2>9. Final assembly</h2>
+  <h3>Gantry</h3>
+  <ol>
+    <li>Press M3 nuts into the hex pockets: two under the beam at the joint, and one at the back of each leg's foot. Press the two M4 nuts into the pockets under the ends of the sensor bar.</li>
+    <li>Slide the right half's tongue into the left half's beam, and bolt them together with the two <b>M3 × 35</b> bolts down through the joint.</li>
+    <li><b>Receivers</b> (the halves with three wires): feed each one's cable up through its pod's end into the beam, press it into the pod <b>LED down</b>, and screw it in with an M2 × 10 through its mounting hole.</li>
+    <li>Crimp each receiver to a 4-pin JST XH plug for its lane: <b>red to pin 4</b> (5V), <b>black to pin 3</b> (GND), <b>white to pin 2</b> (SIG), pin 1 empty.</li>
+    <li><b>USB-C socket:</b> push its Micro-B end in through the hole in the right leg from outside, and screw the flange on with its two M3 screws.</li>
+    <li><b>MX key:</b> solder two wires to the switch's pins and crimp a 2-pin JST XH plug on the other end for RESET (J10). Clip the switch into the cover from the top, keycap on. (Or clip in the blank.)</li>
+    <li><b>Gate switch:</b> run the 2-core cable from the start gate along the underside of the track, up the left leg (in at the slot at the back), along the beam, and crimp a 2-pin plug for GATE (J9). Wire it to the switch's C and NC terminals, so it's closed while the gate is up.</li>
+  </ol>
+  <h3>Board</h3>
+  <ol start="8">
+    <li>Lower the board onto its ledges in the right half of the beam, Pico to the right. Plug the Micro-B into the Pico and push the spare USB lead down the right leg's channel.</li>
+    <li>Plug in the three lane plugs (lane 1 to J1, and so on), GATE and RESET. Screw the board's left end down with the two M2.5 screws.</li>
+    <li>Push the lens into the cover and screw the cover on with four M3 × 12 screws. Its ribs hold the Pico's end of the board.</li>
+  </ol>
+  <figure><img src="../../hardware/gate/renders/board-in-beam.png" style="width:100%"><figcaption>The board on its ledges inside the beam (front wall cut away), with the cover above and the USB plug heading into the right leg.</figcaption></figure>
+  <h3>Sensor bar</h3>
+  <ol start="11">
+    <li><b>Emitters</b> (the halves with two wires): screw each into its pocket under the bar, <b>LED up</b>, with an M2 × 10.</li>
+    <li>Join the three emitters' wires in the groove (reds together, blacks together) into one 2-core lead out of the bar's left end. Tape over the groove. Fit an inline 2-pin plug where the lead leaves the bar.</li>
+    <li>Make the matching lead for the board's AUX header (J12): <b>GND on pin 1, 5V on pin 3</b>, using a 3-way 2.54 mm housing over pins 1–3 with the middle empty. Run it down the left leg and out of the slot at its back.</li>
+  </ol>
+  <h3>On the track</h3>
+  <ol start="14">
+    <li>Set the gate on the board at the finish line, legs either side, top jaws on the board.</li>
+    <li>From underneath, push the sensor bar up so its turrets go into the three holes and its ends slide up into the legs' sockets, until it stops.</li>
+    <li>Push the two <b>M3 × 40</b> lock pins through the legs and the bar, and fit their nuts. Tighten the <b>M4</b> thumbscrews up against the board until snug.</li>
+    <li>Plug in the sensor bar's lead, and connect the gate's USB-C socket to the laptop.</li>
+  </ol>
+  <figure><img src="../../hardware/gate/renders/usb-socket.png" style="width:55%"><figcaption>The USB-C socket on the right leg.</figcaption></figure>
+</section>
+
+<section>
+  <h2>10. Setting up and testing</h2>
+  <h3>Settings</h3>
+  <p>In a serial terminal (send each line followed by Enter):</p>
+<pre>#lanes 3
+#save</pre>
+  <p>Other settings, all saved with <code>#save</code>:</p>
+  <table>
+    <tr><th>Send</th><th>Does</th></tr>
+    <tr><td><code>#gate-trip low</code></td><td>if your gate switch works the other way round (races start when you lift the gate)</td></tr>
+    <tr><td><code>#lane-trip low</code></td><td>if your sensors go high while they see the beam</td></tr>
+    <tr><td><code>#button next</code></td><td>the key calls up the next heat (sends <code>#next</code> and types Enter) instead of resetting</td></tr>
+    <tr><td><code>#button-key pagedown</code></td><td>the key that <code>#button next</code> types (enter, space, pagedown, f5, a letter...)</td></tr>
+    <tr><td><code>I</code></td><td>shows the version and all settings</td></tr>
+  </table>
+  <h3>Test mode</h3>
+  <ol>
+    <li>Hold the MX key while plugging the timer in. The status light goes white.</li>
+    <li>The terminal shows <code>test lanes=... gate=closed</code> four times a second. Block each lane's beam with a hand or a car: its position should change to <code>1</code>. Open the start gate: <code>gate=open</code>.</li>
+    <li>Press the key to leave test mode.</li>
+  </ol>
+  <h3>A test race</h3>
+  <ol>
+    <li>Close the gate and press the key: the light goes green (ready).</li>
+    <li>Drop the gate and run a car down each lane. The light goes blue while racing; the terminal shows <code>B</code>, then a line per lane, like <code>1 - 2.8734</code>, and the light goes red.</li>
+    <li>In the race software, choose the PDT timer, the gate's serial port, and 3 lanes.</li>
+  </ol>
+  <div class="note"><b>Timing check:</b> Adafruit gives the receivers' response time as under 2 ms. Before relying on
+  close finishes, run the same car down each lane several times, and swap sensors between lanes, to see how
+  consistent the lanes are. Until then, treat finishes within a couple of thousandths as ties.</div>
+</section>
+
+<section>
+  <h2>11. Troubleshooting</h2>
+  <table>
+    <tr><th>What you see</th><th>Try</th></tr>
+    <tr><td>No serial port appears</td><td>Use a data cable, not a charge-only one. Re-flash the firmware (section 5). Check the Micro-B is fully in the Pico.</td></tr>
+    <tr><td>Status light stays off</td><td>D1 the wrong way round (long leg in the second hole), or its 220 Ω resistors missing.</td></tr>
+    <tr><td>Light blinks amber and never goes green</td><td>It's waiting for a reset: press the key, or send <code>R</code>. If it replies <code>O</code>, the gate reads as open: check the gate switch's wiring, or <code>#gate-trip low</code>.</td></tr>
+    <tr><td>A lane always shows tripped in test mode</td><td>Emitter not powered (check the AUX lead: GND pin 1, 5V pin 3), emitter and receiver not lined up, or the turret's bore blocked.</td></tr>
+    <tr><td>A lane never trips</td><td>Receiver wired to the wrong pins (white must be pin 2), or bright sunlight on the receivers.</td></tr>
+    <tr><td>Times only for some lanes</td><td>Check <code>#lanes</code> matches the track, and that the software hasn't masked a lane (<code>U</code> unmasks them all).</td></tr>
+    <tr><td>The gate rocks on the track</td><td>Tighten the thumbscrews; check the lock pins are through both the legs and the bar.</td></tr>
+  </table>
+  <h3>Where things are in the repository</h3>
+  <table>
+    <tr><td><code>dist/</code></td><td>firmware files to flash</td></tr>
+    <tr><td><code>hardware/fab/</code></td><td>Gerbers and drill files, parts list (<code>bom.md</code>, <code>bom.csv</code>)</td></tr>
+    <tr><td><code>hardware/gate/</code></td><td>the gate: STL files, the OpenSCAD source and its own notes</td></tr>
+    <tr><td><code>docs/wiring.md</code></td><td>sensor, gate, button and display wiring in detail</td></tr>
+    <tr><td><code>docs/protocol.md</code></td><td>every serial command and setting</td></tr>
+  </table>
+</section>
+
+</body>
+</html>
