@@ -23,10 +23,16 @@ lanes = [50, 148, 246];           // rail (and lane) centre lines
 under_clear = 19;                 // the pine supports hold the board 19 mm off the floor
 
 // ------------------------------------------------------------------ The sensors
-// Adafruit IR break-beam (3 mm LEDs, ADA2167): each half is 20 x 10 x 8 mm, the LED looking out of one end
-// and the cable out of the other. Pockets hold them standing up, LED end towards the beam.
-sen = [10, 8, 20];                // across, along, long
-sen_fit = 0.25;                   // clearance each side: snug, with a dab of hot glue to hold
+// Adafruit IR break-beam (3 mm LEDs, ADA2167; Omron housings): each half is 20 x 10 x 8 mm. The LED looks
+// out of the broad 20 x 10 face, 5 mm from one end; 10 mm from it is a 2.4 mm mounting hole through the
+// housing, and the cable leaves the end beside the hole. The sensors lie flat, held by an M2 screw
+// through that hole, LED towards the beam.
+sen = [20, 10, 8];                // long (x), wide (y), thick (z)
+sen_led = 5;                      // LED centre from the far (non-cable) end
+sen_hole = 15;                    // mounting hole centre from the same end
+sen_fit = 0.25;                   // clearance each side
+// Each sensor lies along x with its LED on the lane centre and its cable end towards -x (the left)
+function sen_x0(lane_x) = lane_x - (sen[0] - sen_led);   // its cable end
 
 // ------------------------------------------------------------------ The gate
 clear_h = 120;                    // underside of the beam above the race surface (car clearance)
@@ -47,8 +53,9 @@ beam_z1 = clear_h + beam_h;
 x0 = -leg_w - edge_gap;
 x1 = track_w + leg_w + edge_gap;
 // ------------------------------------------------------------------ The sensor bar (under the track)
-// One solid bar under the board at the finish line, leg to leg. Its three turrets rise into slots in the
-// rails and hold the emitters; a channel inside takes their wiring to one lead. Each end is a dovetail
+// One solid bar under the board at the finish line, leg to leg. It holds the three emitters flat
+// underneath, LED up, each looking up through a turret that rises into a 10 mm hole through the rail and
+// board; a groove underneath takes their wiring to one lead. Each end is a dovetail
 // tenon that slides up into a socket in the leg, locked by an M3 pin, and an M4 thumbscrew in each end
 // presses the board up against the legs' top jaws.
 bar_top = -slot_h;                // 0.6 mm under the board, taken up by the thumbscrews
@@ -57,8 +64,11 @@ bar_w = 30;                       // along the track
 tenon = [5, 10, 14];              // depth into the leg, width at the root, width at the tip
 tenon_fit = 0.25;
 pin_xz = [-edge_gap - 2.5, -16];  // the lock pin's place in the left tenon (mirrored on the right)
-thumb = [[20, 9.5], [track_w - 20, 9.5]];
-turret_top = rail_t - 1;          // the sensor's LED end, 1 mm below the rail top
+thumb = [[20, -9.5], [track_w - 20, -9.5]];
+turret_top = rail_t - 1;          // the top of each turret (the light's way out), 1 mm below the rail top
+turret_d = 9.6;                   // in a 10 mm hole
+bore_d = 6;                       // the light's path up through the turret
+groove_y = [6, 12];               // the wiring groove under the bar, beside the sensors
 foot_z = bar_bot;                 // the legs reach down beside the bar
 
 // ------------------------------------------------------------------ The pod (the timer board)
@@ -98,9 +108,12 @@ module front_text(s, size, x, z) { // raised lettering on the front face (Y = -b
 }
 
 // A pocket for one sensor standing upright, LED end at z = 0 looking down (-Z), body going up
-module sensor_pocket(up_len) {
-    translate([-(sen[0] / 2 + sen_fit), -(sen[1] / 2 + sen_fit), -0.01]) cube([sen[0] + 2 * sen_fit, sen[1] + 2 * sen_fit, up_len]);
+// A pocket for one sensor lying flat, open downwards from z = 0 to depth d; lane_x is its LED's place
+module flat_pocket(lane_x, d) {
+    translate([sen_x0(lane_x) - sen_fit, -sen[1] / 2 - sen_fit, -0.01]) cube([sen[0] + 2 * sen_fit, sen[1] + 2 * sen_fit, d + 0.01]);
 }
+// The M2 screw's pilot, at the sensor's mounting hole
+function sen_hole_x(lane_x) = lane_x - (sen_hole - sen_led);   // 10 mm from the LED, towards the cable
 
 // ================================================================== The gantry
 module leg(side) {                // side -1 = left (x < 0), +1 = right
@@ -141,16 +154,27 @@ module beam() {
         }
         // the cable run inside, from leg to leg
         translate([x0 + 3, -beam_d / 2 + wall, beam_z0 + bot_wall]) cube([x1 - x0 - 6, beam_d - 2 * wall, beam_h - bot_wall - wall]);
-        // a sensor over each lane, pushed up from underneath, LED flush with the underside
-        for (x = lanes) translate([x, 0, beam_z0]) sensor_pocket(bot_wall + 0.02);
+        // over each lane: the receiver's pod (below), its screw, and a hole for its cable into the beam
+        for (x = lanes) {
+            translate([0, 0, beam_z0 - pod_s]) flat_pocket(x, pod_s - 0.2);
+            translate([sen_hole_x(x), 0, beam_z0 - 1]) cylinder(d = 1.8, h = bot_wall + 0.5);
+            translate([sen_x0(x) - 4, -3, beam_z0 - 1]) cube([4.5, 6, bot_wall + 2]);
+        }
         // bolts through the beam that hold the pod (and the two halves) together, and the cable holes
         for (b = pod_bolts) translate([b[0], b[1], beam_z0 - 1]) cylinder(d = 3.4, h = beam_h + 2);
         for (s = [-1, 1]) translate([pod_x + s * 63 - 5, -9, beam_z1 - wall - 1]) cube([10, 18, wall + 2]);
     }
-    // a sleeve above each sensor pocket keeps the sensor upright
-    for (x = lanes) translate([x, 0, beam_z0 + bot_wall]) difference() {
-        translate([-(sen[0] / 2 + 2), -(sen[1] / 2 + 2), 0]) cube([sen[0] + 4, sen[1] + 4, 14]);
-        sensor_pocket(15);
+}
+
+// A small pod under the beam over each lane, holding a receiver flat, LED looking down at the track
+pod_s = sen[2] + 0.5;             // how far the pods hang below the beam
+module sensor_pods() {
+    for (x = lanes) difference() {
+        translate([sen_x0(x) - 2.5, -sen[1] / 2 - 2.5, beam_z0 - pod_s]) rbox([sen[0] + 5, sen[1] + 5, pod_s + 0.01], 2);
+        translate([0, 0, beam_z0 - pod_s]) flat_pocket(x, pod_s - 0.2);
+        translate([sen_hole_x(x), 0, beam_z0 - pod_s - 1]) cylinder(d = 1.8, h = pod_s + bot_wall);
+        // the cable leaves the sensor's end: out through the pod's end wall and up into the beam
+        translate([sen_x0(x) - 4, -3, beam_z0 - pod_s - 1]) cube([4.5, 6, pod_s + 2]);
     }
 }
 
@@ -173,7 +197,7 @@ module leg_channels() {
         translate([cx - 5.5, 0, -8]) cube([11, beam_d, 9]);
     }
 }
-module gantry() { difference() { union() { leg(-1); leg(1); beam(); } leg_channels(); } }
+module gantry() { difference() { union() { leg(-1); leg(1); beam(); sensor_pods(); } leg_channels(); } }
 
 // The two printed halves. The right half carries a hollow tongue that slides 8 mm into the left half's
 // beam; a collar filling the end of the right half's beam holds it, and cables pass through both
@@ -289,22 +313,28 @@ module led_lens() {
 }
 
 // ================================================================== The sensor bar
-// The track needs a slot at the finish line on each rail centre line: two touching 12 mm holes, 12 mm
-// apart, cleaned into one 12 x 24 mm slot. The bar's turrets push up into them from underneath.
+// The track needs one 10 mm hole at the finish line on each rail centre line, through rail and board. The
+// bar's turrets push up into them from underneath.
+pocket_d = sen[2] + 0.3;          // the emitters' pockets, up from the bar's underside
 module sensor_bar() {
     difference() {
         union() {
             translate([0, -bar_w / 2, bar_bot]) rbox([track_w, bar_w, bar_top - bar_bot], 3);
-            for (x = lanes) hull() for (y = [-6, 6]) translate([x, y, bar_top - 0.01]) cylinder(d = 11.6, h = turret_top - bar_top + 0.01);
+            for (x = lanes) translate([x, 0, bar_top - 0.01]) cylinder(d = turret_d, h = turret_top - bar_top + 0.01);
             for (side = [-1, 1]) mirror_side(side) translate([0, 0, bar_bot]) linear_extrude(bar_top - bar_bot) tenon_shape(0);
         }
-        // an emitter in each turret, dropped in from the top, LED end flush with it (8 mm across the
-        // rail, 10 mm along it); its cable goes down into the channel
-        for (x = lanes) translate([x - sen[1] / 2 - sen_fit, -sen[0] / 2 - sen_fit, turret_top - sen[2]])
-            cube([sen[1] + 2 * sen_fit, sen[0] + 2 * sen_fit, sen[2] + 1]);
-        // the wiring channel, from lane 3 along to the left end, where the lead comes out underneath
-        translate([6, -5, bar_bot + 1.5]) cube([lanes[2] + 8 - 6, 8, turret_top - sen[2] - bar_bot - 1.5 + 0.01]);
-        translate([6, -5, bar_bot - 1]) cube([7, 8, 4]);
+        for (x = lanes) {
+            // the emitter, in from underneath, LED face up against the top of its pocket
+            translate([0, 0, bar_bot - 1]) flat_pocket(x, pocket_d + 1);
+            // its light's way up through the bar and turret
+            translate([x, 0, bar_bot + pocket_d - 0.01]) cylinder(d = bore_d, h = turret_top - bar_bot);
+            // the M2 screw through its mounting hole into the bar (M2 x 10, self-tapping)
+            translate([sen_hole_x(x), 0, bar_bot]) cylinder(d = 1.8, h = pocket_d + 3);
+            // its cable, from the pocket's left end into the wiring groove
+            translate([sen_x0(x) - 4, -3, bar_bot - 1]) cube([4.01, groove_y[1] + 3, 6]);
+        }
+        // the wiring groove underneath, from lane 3 to the left end, where the lead leaves
+        translate([4, groove_y[0], bar_bot - 1]) cube([sen_x0(lanes[2]) - 4, groove_y[1] - groove_y[0], 6]);
         // thumbscrews (M4 x 16) up through each end, nuts trapped underneath
         for (t = thumb) translate([t[0], t[1], bar_bot - 1]) {
             cylinder(d = 4.4, h = bar_top - bar_bot + 2);
@@ -320,7 +350,7 @@ module track_preview() {
     color("BurlyWood") translate([0, -350, -board_t]) cube([track_w, 600, board_t]);
     color("Tan") for (x = lanes) difference() {
         translate([x - rail_w / 2, -350, 0]) cube([rail_w, 600, rail_t]);
-        hull() for (y = [-6, 6]) translate([x, y, -1]) cylinder(d = 12, h = 10);
+        translate([x, 0, -1]) cylinder(d = 10, h = 10);
     }
     // a car about to cross the line in lane 2
     color("SteelBlue") translate([lanes[1] - 33, -150, 10]) cube([66, 178, 30]);

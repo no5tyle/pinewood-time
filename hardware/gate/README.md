@@ -25,7 +25,7 @@ From the build guide:
 The gate's legs stand just outside the board edges (0.5 mm clear), with a jaw reaching 8 mm onto the top
 of the board (the outer wheels run from 15 mm in). The sensor bar runs under the board from leg to leg and
 locks into both, so the gate and bar together make a frame around the board; an M4 thumbscrew in each end
-of the bar presses the board up against the top jaws. The beam is 120 mm above the race surface. Put the finish line at least
+of the bar presses the board up against the top jaws. The beam is 120 mm above the race surface, and the sensor pods under it 111 mm. Put the finish line at least
 150 mm from the tail end, clear of the tail support and its screws; the drawings use 200 mm.
 
 The track has no stopping area after the finish, so plan something to catch the cars (a towel, or a
@@ -55,18 +55,24 @@ the chequers and lane numbers start (at 40.0 mm).
 | 4 | M3 × 8 self-tapping screws | the timer board onto its standoffs |
 | 4 | M3 × 10 countersunk self-tapping screws | the lid |
 | 2 | M3 × 40 bolts and nuts | the lock pins through the legs and the bar's dovetails |
+| 6 | M2 × 10 self-tapping screws | one through each sensor's mounting hole |
 | 2 | M4 × 16 bolts and M4 nuts | the thumbscrews: the nuts press into the underside of the bar's ends, and the bolts screw up against the board until snug |
 | 1 | MX switch (any) and a 1u keycap | optional: the button |
 
 ## Sensors: will they fit?
 
-Yes. Each half of the Adafruit 3 mm break-beam sensor is 20 × 10 × 8 mm.
+Yes, lying flat. Each half of the Adafruit 3 mm break-beam sensor is an Omron housing 20 × 10 × 8 mm.
+Its LED looks out of the broad face, 5 mm from one end. 10 mm from the LED is a 2.4 mm mounting hole
+through the housing, and the cable leaves the end beside it. Both mounts hold the sensor by an M2 × 10
+self-tapping screw through that hole, with its LED on the lane centre and its cable towards the left.
 
-- **In the gantry:** a pocket over each lane centre in the underside of the beam. The sensor pushes up
-  from below, cable first, until its LED end is flush with the underside. A sleeve inside keeps it upright.
-- **In the track:** the rail and board together are 15 mm thick and the sensor 20 mm long. A turret on the
-  sensor bar rises into the rail and stands the sensor upright with its LED end 1 mm below the rail top.
-  The bar is 13 mm deep under the board, leaving 6 mm to the floor of the 19 mm the supports allow.
+- **In the gantry:** a small pod under the beam over each lane holds a receiver flat, LED looking down.
+  Its cable goes out of the pod's end and up into the beam. The pods hang 8.5 mm below the beam, so the
+  clearance over the track is 111 mm.
+- **In the track:** the sensor bar holds each emitter flat in a pocket on its underside, LED up. Its light
+  goes up a 6 mm bore through the bar and a round turret that rises into a 10 mm hole through the rail
+  and board, ending 1 mm below the rail top. The bar is 13 mm deep under the board, leaving 6 mm to the
+  floor of the 19 mm the supports allow.
 
 ![Sensor in the track](renders/sensor-fit.svg)
 
@@ -75,15 +81,13 @@ Yes. Each half of the Adafruit 3 mm break-beam sensor is 20 × 10 × 8 mm.
 Put the **emitters in the track, shining up, and the receivers in the gantry, looking down**. That way the
 receivers face the track, not the hall's lights or a sunny window.
 
-These pockets assume the LED looks out of one end of the housing, opposite the cable. Check your sensors
-before cutting the track: if the LED is on a broad face instead, change `sen` and the pockets in the `.scad`.
-
 ### The sensor bar
 
-One solid piece. Each turret takes an emitter from the top, LED up, flush with the turret, and its cable
-goes down into a channel inside the bar that runs to the bar's left end. Emitters only need power, so join
-all three inside the channel (reds together, blacks together) into one 2-core lead. It comes out under
-the left end and goes up the left leg (in at the slot at the back of the leg) to the pod.
+One solid piece. Each emitter goes into its pocket from underneath, LED face up, and is screwed in with
+its M2 screw. Its cable leaves the pocket's left end into a groove along the underside of the bar. Emitters
+only need power, so join all three in the groove (reds together, blacks together) into one 2-core lead,
+and tape over the groove to keep the wires in. The lead leaves the left end and goes up the left leg (in
+at the slot at the back of the leg) to the pod.
 
 At the pod, the lead plugs into the AUX header (J12): GND on pin 1, 5V on pin 3. A 3-way 2.54 mm housing
 over pins 1-3 with the middle left empty does it. Fit an inline 2-pin plug where the lead leaves the bar,
@@ -97,15 +101,13 @@ at the top, so the bar stops just under the board. An M3 pin through the leg and
 On Track E, for each lane:
 
 1. Mark the finish line square across the board, 200 mm from the tail end.
-2. On each rail centre line (50, 148, 246 mm from the left edge), mark two hole centres 6 mm either side of
-   the finish line (12 mm apart).
-3. Drill them with the 12 mm Forstner bit, the same way as the starting-gate slots: a pilot hole right
-   through, a few millimetres from the underside, then finish from the top so the underside doesn't
-   blow out. The two holes touch: pare or file the two cusps between them into one 12 × 24 mm slot.
-4. The sensor bar's turrets go up into these slots when the gate is fitted (below). Nothing is screwed to
+2. Where it crosses each rail centre line (50, 148, 246 mm from the left edge), drill a 10 mm hole
+   through the rail and board. Drill a pilot right through first, then the 10 mm bit a few millimetres in
+   from the underside, then finish from the top, so neither face splinters.
+3. The sensor bar's turrets go up into these holes when the gate is fitted (below). Nothing is screwed to
    the track, so the gate and bar lift off for packing.
 
-That leaves 14 mm of rail either side of the slot, so the rail still guides the wheels. Each emitter sits
+That leaves 15 mm of rail either side of the hole, so the rail still guides the wheels. The turrets stop
 1 mm below the rail top, out of reach of the cars.
 
 The bottom of a car body breaks each beam as the car passes over the rail.
@@ -117,10 +119,11 @@ The bottom of a car body breaks each beam as the car passes over the rail.
 2. Slide the right half's tongue into the left half's beam.
 3. Set the pod on top and bolt down through it and the beam with the four M3 × 40 bolts, with the nuts
    inside the pod. These hold the halves together.
-4. Push the receivers into the beam's three pockets from below, cable first. Feed the cables along the
-   beam, up through the holes in the pod's floor at each end.
-5. Drop the emitters into the sensor bar's turrets, LED up, join their wires in the channel into one
-   2-core lead out of the left end, and fit the inline plug. Run the matching lead from AUX (J12) down
+4. Feed each receiver's cable up through its pod's end into the beam, then press the receiver into the
+   pod, LED down, and screw it in with an M2 × 10. Feed the cables along the beam, up through the holes
+   in the pod's floor at each end.
+5. Screw the emitters into the sensor bar's pockets, LED up, join their wires in the groove into one
+   2-core lead out of the left end, tape the groove over, and fit the inline plug. Run the matching lead from AUX (J12) down
    the left leg's channel and out of the slot at its back.
 6. Crimp each receiver to its lane's 4-pin JST XH plug: red to pin 4 (5V), black to pin 3 (GND), white
    to pin 2 (SIG), pin 1 empty. The emitters don't go to the lane plugs; they're powered by the bar's lead.
@@ -130,7 +133,7 @@ The bottom of a car body breaks each beam as the car passes over the rail.
    in the pod's end.
 9. Push the lens into the lid, clip in the switch (or the blank), and screw the lid down.
 10. On the track: set the gate on the board at the finish line with its legs either side. From
-    underneath, push the sensor bar up so its turrets go into the rail slots and its ends slide up into
+    underneath, push the sensor bar up so its turrets go into the rail holes and its ends slide up into
     the legs' sockets, until it stops. Push the M3 pins through the legs and the bar, fit their nuts,
     and tighten the thumbscrews up against the board. Plug in the bar's lead.
 
