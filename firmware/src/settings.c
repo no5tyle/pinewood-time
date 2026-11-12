@@ -8,7 +8,7 @@
 
 /* The last 4 KB sector of flash, well clear of the firmware */
 #define SETTINGS_OFFSET (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
-#define SETTINGS_MAGIC 0x50544D31u /* "PTM1" */
+#define SETTINGS_MAGIC 0x50544D32u /* "PTM2": the layout with the button settings */
 
 typedef struct {
     uint32_t magic;

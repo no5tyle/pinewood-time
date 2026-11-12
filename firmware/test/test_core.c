@@ -208,6 +208,82 @@ static void test_mode_test(void) {
     EXPECT_STR(out, "");
 }
 
+static void test_button_reset_mode(void) {
+    pt_timer t = timer4();
+    clear();
+    EXPECT(pt_button(&t, &closed, true) == PT_BUTTON_NOTHING);
+    EXPECT_STR(out, "K\r\n"); /* default: the button resets */
+    EXPECT(t.mode == PT_READY);
+    EXPECT(t.key_to_press == 0);
+    pt_gate_tripped(&t, 1000);
+    clear();
+    pt_button(&t, &closed, true); /* mid-race: ends it */
+    EXPECT(t.mode == PT_FINISH);
+    EXPECT_STR(out, "1 - 99.9990\r\n2 - 99.9990\r\n3 - 99.9990\r\n4 - 99.9990\r\n");
+    t.mode = PT_TEST;
+    EXPECT(pt_button(&t, &closed, true) == PT_BUTTON_LEAVE_TEST);
+}
+
+static void test_button_next_mode(void) {
+    pt_timer t = timer4();
+    send(&t, "#button next\r", &closed);
+    EXPECT(t.cfg.button_next);
+    EXPECT(t.cfg.button_key == 0x28); /* enter, by default */
+    send(&t, "R", &closed);
+    pt_gate_tripped(&t, 1000);
+    pt_lane_tripped(&t, 0, 2001000);
+    clear();
+    pt_button(&t, &closed, true); /* racing: still ends the race */
+    EXPECT(t.mode == PT_FINISH);
+    EXPECT(t.key_to_press == 0);
+    clear();
+    pt_button(&t, &closed, true); /* finished: asks for the next heat */
+    EXPECT_STR(out, "#next\r\n");
+    EXPECT(t.key_to_press == 0x28);
+    EXPECT(t.mode == PT_FINISH); /* the software resets it when it's ready */
+    t.key_to_press = 0;
+    clear();
+    pt_button(&t, &closed, false); /* nobody listening: falls back to a reset */
+    EXPECT_STR(out, "K\r\n");
+    EXPECT(t.key_to_press == 0);
+    send(&t, "#button-key none\r", &closed);
+    clear();
+    pt_button(&t, &closed, true);
+    EXPECT_STR(out, "#next\r\n");
+    EXPECT(t.key_to_press == 0); /* no key: the serial message only */
+    send(&t, "#button reset\r", &closed);
+    EXPECT(!t.cfg.button_next);
+}
+
+static void test_button_key_setting(void) {
+    pt_timer t = timer4();
+    clear();
+    send(&t, "#button-key PageDown\r", &closed);
+    EXPECT_STR(out, ".\r\n");
+    EXPECT(t.cfg.button_key == 0x4E);
+    clear();
+    send(&t, "#button-key banana\r", &closed);
+    EXPECT_STR(out, "?\r\n");
+    EXPECT(t.cfg.button_key == 0x4E);
+    uint8_t code;
+    char buf[8];
+    EXPECT(pt_key_code("n", &code) && code == 0x11);
+    EXPECT(pt_key_code("0", &code) && code == 0x27);
+    EXPECT(pt_key_code("f5", &code) && code == 0x3E);
+    EXPECT(pt_key_code("f12", &code) && code == 0x45);
+    EXPECT(!pt_key_code("f13", &code));
+    EXPECT(!pt_key_code("f05", &code));
+    EXPECT(!pt_key_code("", &code));
+    EXPECT_STR(pt_key_name(0x11, buf, sizeof buf), "n");
+    EXPECT_STR(pt_key_name(0x3E, buf, sizeof buf), "f5");
+    EXPECT_STR(pt_key_name(0x2C, buf, sizeof buf), "space");
+    EXPECT_STR(pt_key_name(0, buf, sizeof buf), "none");
+    send(&t, "#button next\r", &closed);
+    clear();
+    send(&t, "I", &closed);
+    EXPECT(strstr(out, " button next, key pagedown\r\n") != NULL);
+}
+
 int main(void) {
     test_power_on_and_reset();
     test_a_race();
@@ -219,6 +295,9 @@ int main(void) {
     test_settings();
     test_formatting();
     test_mode_test();
+    test_button_reset_mode();
+    test_button_next_mode();
+    test_button_key_setting();
     if (failures) {
         printf("%d failure(s)\n", failures);
         return 1;

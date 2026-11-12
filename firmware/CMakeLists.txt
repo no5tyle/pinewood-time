@@ -16,30 +16,30 @@ add_executable(pinewood_time
     src/timer_core.c
     src/display.c
     src/settings.c
+    src/usb.c
 )
 
 target_compile_options(pinewood_time PRIVATE -Wall -Wextra -Werror)
 
-# How it shows up on the computer
-target_compile_definitions(pinewood_time PRIVATE
-    USBD_MANUFACTURER="no5tyle"
-    USBD_PRODUCT="pinewood-time race timer"
-)
+# USB (a serial port and a keyboard) is run by usb.c with TinyUSB, configured by src/tusb_config.h
+target_include_directories(pinewood_time PRIVATE src)
 
 target_link_libraries(pinewood_time
     pico_stdlib
     pico_flash
+    pico_unique_id
+    tinyusb_device
     hardware_i2c
     hardware_flash
     hardware_gpio
 )
 
-# Talk over USB (it shows up as a serial port), not the UART pins
-pico_enable_stdio_usb(pinewood_time 1)
+# No stdio: the serial port is usb.c's
+pico_enable_stdio_usb(pinewood_time 0)
 pico_enable_stdio_uart(pinewood_time 0)
 
 pico_set_program_name(pinewood_time "pinewood-time")
-pico_set_program_version(pinewood_time "1.0.0")
+pico_set_program_version(pinewood_time "1.1.0")
 pico_set_program_url(pinewood_time "https://github.com/no5tyle/pinewood-time")
 
 pico_add_extra_outputs(pinewood_time)

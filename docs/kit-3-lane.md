@@ -27,7 +27,9 @@ Prices are rough, in Australian dollars with GST, from late 2026. Check the list
 | 1 | Micro-USB data cable (not a charge-only one) | timer to the race computer |
 | ~6 m | 4-core cable (alarm or phone cable is fine) | about 1.5 m a lane, and the gate |
 
-Optional: a panel-mount push button on 2-core cable, for a reset button at the finish line.
+Optional: a panel-mount push button on 2-core cable, for a button at the finish line. It resets the
+timer, or with `#button next` calls up the next heat in the race software
+([details](protocol.md#the-reset-button-next-heat)).
 
 About A$60 plus the boards. The resistor and connector kits have plenty left over for more boards.
 

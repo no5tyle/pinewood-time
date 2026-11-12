@@ -1,20 +1,20 @@
 /*
  * pinewood-time: a pinewood derby race timer for the Raspberry Pi Pico.
  *
- * Talks to race software over USB (it shows up as a serial port) using the PDT timer protocol. The timing
+ * Talks to race software over USB (it shows up as a serial port, and a keyboard for the reset button's
+ * "next heat" key: usb.c) using the PDT timer protocol. The timing
  * itself happens in an interrupt: each lane's beam break and the start gate opening are stamped with the
  * Pico's microsecond clock the moment they happen, then handed to the timer core (timer_core.c).
  */
 #include <stdio.h>
-#include <string.h>
 
 #include "board.h"
 #include "display.h"
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
-#include "pico/stdio_usb.h"
 #include "settings.h"
 #include "timer_core.h"
+#include "usb.h"
 
 /* ---------------------------------------------------------------- Events from the interrupt */
 typedef struct {
@@ -118,7 +118,7 @@ static void show_status(const pt_timer *t, uint64_t now_us) {
 /* ---------------------------------------------------------------- USB serial */
 static void write_usb(const char *text, void *ctx) {
     (void)ctx;
-    fputs(text, stdout);
+    usb_write(text);
 }
 
 /* ---------------------------------------------------------------- Lane displays */
@@ -159,8 +159,7 @@ static void show_lanes(const pt_timer *t, uint64_t now_us) {
 
 /* ---------------------------------------------------------------- Main loop */
 int main(void) {
-    stdio_usb_init();
-    stdio_set_translate_crlf(&stdio_usb, false); /* the protocol sends its own \r\n */
+    usb_init();
     cfg = settings_load();
     set_up_led();
     set_up_inputs();
@@ -169,7 +168,8 @@ int main(void) {
         if (displays & (1u << lane)) display_text(lane, "8.8.8.8.");
 
     /* Give the computer a moment to open the port, so it sees the power-on message */
-    for (int i = 0; i < 20 && !stdio_usb_connected(); i++) sleep_ms(100);
+    absolute_time_t wait_until = make_timeout_time_ms(2000);
+    while (!usb_host_listening() && !time_reached(wait_until)) usb_task();
 
     static pt_timer timer;
     pt_init(&timer, &cfg, write_usb, NULL);
@@ -189,19 +189,20 @@ int main(void) {
             } else if (e.kind == EVENT_GATE) {
                 pt_gate_tripped(&timer, e.at_us);
             } else if (e.kind == EVENT_RESET) {
-                if (timer.mode == PT_TEST) {
-                    /* leaving test mode: start as if just powered on */
-                    pt_init(&timer, &cfg, write_usb, NULL);
-                } else if (timer.mode == PT_RACING) {
-                    pt_force_end(&timer);
-                } else {
-                    pt_reset(&timer, &in);
-                }
+                /* ends a race, leaves test mode, or resets / asks for the next heat (#button) */
+                if (pt_button(&timer, &in, usb_host_listening()) == PT_BUTTON_LEAVE_TEST)
+                    pt_init(&timer, &cfg, write_usb, NULL); /* start as if just powered on */
             }
         }
 
+        if (timer.key_to_press) {
+            usb_press_key(timer.key_to_press);
+            timer.key_to_press = 0;
+        }
+
+        usb_task();
         int c;
-        while ((c = getchar_timeout_us(0)) != PICO_ERROR_TIMEOUT) pt_receive(&timer, (char)c, &in);
+        while ((c = usb_read()) >= 0) pt_receive(&timer, (char)c, &in);
 
         if (timer.config_changed) {
             timer.config_changed = false;
@@ -225,7 +226,6 @@ int main(void) {
         }
         show_status(&timer, now);
         show_lanes(&timer, now);
-        stdio_flush();
-        tight_loop_contents();
+        usb_task();
     }
 }

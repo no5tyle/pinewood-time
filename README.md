@@ -7,7 +7,8 @@ everything a timer needs, and the firmware for it.
 
 - **Up to 8 lanes**, timed to the microsecond from the start gate opening (results to 0.0001 s)
 - **PDT-compatible**: talks the protocol of the PDT timer over USB, so race software with a PDT option can drive it
-- Start gate and reset button inputs, plus a reset button on the board
+- Start gate and reset button inputs, plus a reset button on the board. The button can instead call up
+  the next heat in the race software (a serial message, and a key press on the timer's USB keyboard)
 - Optional per-lane 7-segment displays (I2C), showing a running clock, then each car's time and place
 - RGB status light; sensor test mode; settings saved in flash
 - All through-hole parts, about 50 of them, hand-solderable; powered from the USB cable

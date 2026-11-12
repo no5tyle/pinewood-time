@@ -1,5 +1,6 @@
 #include "timer_core.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,7 +40,8 @@ static uint8_t all_lanes(const pt_timer *t) {
 }
 
 pt_config pt_default_config(void) {
-    pt_config c = {.num_lanes = 4, .lane_trip_high = true, .gate_trip_high = true, .brightness = 6};
+    pt_config c = {.num_lanes = 4, .lane_trip_high = true, .gate_trip_high = true, .brightness = 6,
+                   .button_next = false, .button_key = 0x28 /* enter */};
     return c;
 }
 
@@ -191,6 +193,69 @@ void pt_test_report(pt_timer *t, const pt_inputs *in) {
     say_line(t, s);
 }
 
+/* ---------------------------------------------------------------- Keyboard keys (USB HID usage codes) */
+static const struct {
+    const char *name;
+    uint8_t code;
+} KEYS[] = {
+    {"none", 0x00},     {"enter", 0x28},    {"escape", 0x29}, {"tab", 0x2B},   {"space", 0x2C},
+    {"pageup", 0x4B},   {"pagedown", 0x4E}, {"right", 0x4F},  {"left", 0x50},  {"down", 0x51},
+    {"up", 0x52},       {"home", 0x4A},     {"end", 0x4D},
+};
+
+bool pt_key_code(const char *name, uint8_t *code) {
+    for (size_t i = 0; i < sizeof KEYS / sizeof KEYS[0]; i++) {
+        if (strcmp(name, KEYS[i].name) == 0) {
+            *code = KEYS[i].code;
+            return true;
+        }
+    }
+    if (name[0] && !name[1]) { /* one letter or digit */
+        char c = name[0];
+        if (c >= 'a' && c <= 'z') { *code = (uint8_t)(0x04 + (c - 'a')); return true; }
+        if (c >= '1' && c <= '9') { *code = (uint8_t)(0x1E + (c - '1')); return true; }
+        if (c == '0') { *code = 0x27; return true; }
+    }
+    if (name[0] == 'f' && name[1]) { /* f1 to f12 */
+        int n = atoi(name + 1);
+        char check[4];
+        snprintf(check, sizeof check, "%d", n);
+        if (n >= 1 && n <= 12 && strcmp(check, name + 1) == 0) { *code = (uint8_t)(0x3A + n - 1); return true; }
+    }
+    return false;
+}
+
+const char *pt_key_name(uint8_t code, char *buf, int size) {
+    for (size_t i = 0; i < sizeof KEYS / sizeof KEYS[0]; i++)
+        if (KEYS[i].code == code) return KEYS[i].name;
+    if (code >= 0x04 && code <= 0x1D) snprintf(buf, (size_t)size, "%c", 'a' + (code - 0x04));
+    else if (code >= 0x1E && code <= 0x26) snprintf(buf, (size_t)size, "%c", '1' + (code - 0x1E));
+    else if (code == 0x27) snprintf(buf, (size_t)size, "0");
+    else if (code >= 0x3A && code <= 0x45) snprintf(buf, (size_t)size, "f%d", code - 0x3A + 1);
+    else snprintf(buf, (size_t)size, "0x%02x", code);
+    return buf;
+}
+
+/* ---------------------------------------------------------------- The reset button */
+pt_button_result pt_button(pt_timer *t, const pt_inputs *in, bool host_listening) {
+    switch (t->mode) {
+    case PT_TEST:
+        return PT_BUTTON_LEAVE_TEST;
+    case PT_RACING:
+        /* a car stuck on the track: end the race whichever mode the button is in */
+        pt_force_end(t);
+        return PT_BUTTON_NOTHING;
+    default:
+        if (t->cfg.button_next && host_listening) {
+            say_line(t, "#next");
+            t->key_to_press = t->cfg.button_key;
+        } else {
+            pt_reset(t, in);
+        }
+        return PT_BUTTON_NOTHING;
+    }
+}
+
 static void send_info(pt_timer *t) {
     char s[64];
     say_line(t, "-----------------------------");
@@ -204,11 +269,19 @@ static void send_info(pt_timer *t) {
     say_line(t, s);
     snprintf(s, sizeof s, " display brightness %u", (unsigned)t->cfg.brightness);
     say_line(t, s);
+    char key[8];
+    if (t->cfg.button_next)
+        snprintf(s, sizeof s, " button next, key %s", pt_key_name(t->cfg.button_key, key, sizeof key));
+    else
+        snprintf(s, sizeof s, " button reset");
+    say_line(t, s);
     say_line(t, "-----------------------------");
 }
 
-/* "#lanes 6", "#lane-trip low", "#gate-trip high", "#brightness 8", "#save", "#info" */
+/* "#lanes 6", "#lane-trip low", "#gate-trip high", "#brightness 8", "#button next", "#button-key space",
+ * "#save", "#info" */
 static void run_setting(pt_timer *t, char *line) {
+    for (char *p = line; *p; p++) *p = (char)tolower((unsigned char)*p);
     while (*line == ' ') line++;
     char *arg = strchr(line, ' ');
     if (arg) {
@@ -227,6 +300,12 @@ static void run_setting(pt_timer *t, char *line) {
     } else if (strcmp(line, "brightness") == 0 && arg) {
         int n = atoi(arg);
         if (n >= 0 && n <= 15) t->cfg.brightness = (uint8_t)n;
+        else ok = false;
+    } else if (strcmp(line, "button") == 0 && arg && (strcmp(arg, "reset") == 0 || strcmp(arg, "next") == 0)) {
+        t->cfg.button_next = strcmp(arg, "next") == 0;
+    } else if (strcmp(line, "button-key") == 0 && arg) {
+        uint8_t code;
+        if (pt_key_code(arg, &code)) t->cfg.button_key = code;
         else ok = false;
     } else if (strcmp(line, "save") == 0) {
         t->save_requested = true;

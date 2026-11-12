@@ -5,8 +5,8 @@
  * lane's beam breaking, each with a microsecond timestamp) and it answers with text to send back. Being
  * plain C, it's unit tested on a computer (test/test_core.c).
  *
- * It speaks the serial protocol of the PDT open-source pinewood derby timer, so race software that
- * supports a PDT timer (Pinewood Control, DerbyNet, Grand Prix Race Manager, ...) works with it. This is
+ * It speaks the serial protocol of the PDT open-source pinewood derby timer, so race software with a PDT
+ * timer option should be able to drive it. This is
  * a fresh implementation written from the protocol's description, not a copy of the PDT firmware.
  * See docs/protocol.md.
  */
@@ -17,7 +17,7 @@
 #include <stdint.h>
 
 #define PT_MAX_LANES 8
-#define PT_VERSION "1.0.0"
+#define PT_VERSION "1.1.0"
 /* The PDT protocol version this timer implements, reported for the V command */
 #define PT_PROTOCOL_VERSION "3.40"
 
@@ -34,6 +34,8 @@ typedef struct {
     bool lane_trip_high;    /* a lane triggers when its input goes high (beam broken, this board's sensors) */
     bool gate_trip_high;    /* the race starts when the gate input goes high */
     uint8_t brightness;     /* lane displays, 0 to 15 */
+    bool button_next;       /* the reset button asks the race software for the next heat (else it resets) */
+    uint8_t button_key;     /* in that mode, the key it also types (a USB keyboard usage code; 0 = none) */
 } pt_config;
 
 /* Where the timer's replies go: text to the computer */
@@ -50,6 +52,7 @@ typedef struct {
     bool debug;
     bool config_changed;     /* set by a # command; main.c saves it to flash on #save */
     bool save_requested;
+    uint8_t key_to_press;    /* set when the button should type a key; main.c types it and clears this */
     /* a command waiting for its next character (M takes a lane number) */
     char pending;
     /* a # setting command being typed, up to its newline */
@@ -79,6 +82,24 @@ void pt_gate_tripped(pt_timer *t, uint64_t now_us);
 void pt_lane_tripped(pt_timer *t, uint8_t lane, uint64_t now_us);
 /* Ends the race now (F, or the reset button while racing): lanes still out get no time */
 void pt_force_end(pt_timer *t);
+/* What the reset button does, decided by the core */
+typedef enum {
+    PT_BUTTON_NOTHING,   /* handled here: reset, race ended, or next heat asked for */
+    PT_BUTTON_LEAVE_TEST /* leave test mode: main.c restarts the timer as if just powered on */
+} pt_button_result;
+/*
+ * The reset button was pressed. Racing: ends the race. Test mode: leaves it. Otherwise it resets, or with
+ * "#button next" asks the race software for the next heat: sends "#next" and sets key_to_press. If the
+ * computer isn't listening (host_listening false), "next" falls back to a reset so the button still works.
+ */
+pt_button_result pt_button(pt_timer *t, const pt_inputs *in, bool host_listening);
+
+/* Keyboard keys by name, for "#button-key": "enter", "space", "pagedown", "n", "f5", "none" (0) ...
+ * Returns false for a name it doesn't know */
+bool pt_key_code(const char *name, uint8_t *code);
+/* The name of a key code, for #info ("none" for 0) */
+const char *pt_key_name(uint8_t code, char *buf, int size);
+
 /* Enters sensor test mode (reset button held at power on) */
 void pt_enter_test(pt_timer *t);
 /* In test mode, a report of what the sensors see, e.g. "test lanes=1.0. gate=closed" */
