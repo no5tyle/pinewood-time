@@ -329,6 +329,7 @@
     <tr><td>Light blinks amber and never goes green</td><td>It's waiting for a reset: press the key, or send <code>R</code>. If it replies <code>O</code>, the gate reads as open: check the gate switch's wiring, or <code>#gate-trip low</code>.</td></tr>
     <tr><td>A lane always shows tripped in test mode</td><td>Emitter not powered (check the AUX lead: GND pin 1, 5V pin 3), emitter and receiver not lined up, or the turret's bore blocked.</td></tr>
     <tr><td>A lane never trips</td><td>Receiver wired to the wrong pins (white must be pin 2), or bright sunlight on the receivers.</td></tr>
+    <tr><td>Linked gates: fewer lanes than expected</td><td>A patch cable not clicked in, or in the wrong socket (LINK OUT goes to the next gate's LINK IN). Check each gate on its own over USB first.</td></tr>
     <tr><td>Times only for some lanes</td><td>Check <code>#lanes</code> matches the track, and that the software hasn't masked a lane (<code>U</code> unmasks them all).</td></tr>
     <tr><td>The gate rocks on the track</td><td>Tighten the thumbscrews; check the lock pins are through both the legs and the bar.</td></tr>
   </table>
@@ -340,6 +341,37 @@
     <tr><td><code>docs/wiring.md</code></td><td>sensor, gate, button and display wiring in detail</td></tr>
     <tr><td><code>docs/protocol.md</code></td><td>every serial command and setting</td></tr>
   </table>
+</section>
+
+<section>
+  <h2>12. Linking gates: tracks side by side</h2>
+  <p>Build a gate for each track, all the same, and link up to three into one timer (up to 12 lanes). On race day
+  they join with ordinary network patch cables.</p>
+  <figure><img src="../../hardware/gate/renders/link-sockets.png" style="width:70%"><figcaption>The link sockets: RJ45 keystone jacks in brackets on the back of the legs. LINK IN on the left leg, LINK OUT on the right.</figcaption></figure>
+  <h3>Extra parts, per gate</h3>
+  <table>
+    <tr><th>Qty</th><th>Part</th><th>For</th></tr>
+    <tr><td class="n">1</td><td>1N5817 Schottky diode (D2), 4 &times; 1k and 2 &times; 10k resistors (R41&ndash;R46), 2 more 4-pin JST XH sockets (J13, J14)</td><td>the links on the board</td></tr>
+    <tr><td class="n">2</td><td>RJ45 keystone jacks, Cat5e or Cat6, unshielded (tool-less ones need no punch-down tool)</td><td>the link sockets</td></tr>
+    <tr><td class="n">1</td><td>Network patch cable, about 1 m (to cut up for the leads)</td><td>two leads, about 40 cm each</td></tr>
+    <tr><td class="n">4</td><td>M3 &times; 12 self-tapping screws</td><td>the brackets</td></tr>
+  </table>
+  <p>And print <code>link_in.stl</code> and <code>link_out.stl</code>, standing on their tabs.</p>
+  <h3>Building</h3>
+  <ol>
+    <li>On the board, fit J13, J14, R41&ndash;R46 and D2 (its stripe towards the board's 5V, as marked).</li>
+    <li>Make two leads from the patch cable. At one end, punch the wires onto the keystone jack by its T568B colour labels. At the other, crimp four into a 4-pin JST XH plug: <b>1</b> blue (jack pin 4, 5V), <b>2</b> white-brown (pin 7, GND), <b>3</b> white-orange (pin 1), <b>4</b> white-green (pin 3). Cut the other four wires back.</li>
+    <li>Snap each jack into its bracket from the open side. Feed its lead through the hole in the back of the leg, up the leg's channel and along the beam: LINK IN's to J13, LINK OUT's to J14. Screw each bracket to its leg with two M3 &times; 12.</li>
+    <li>On each gate, over USB on its own: send <code>#lanes 3</code> and <code>#save</code>.</li>
+  </ol>
+  <h3>Racing</h3>
+  <ol>
+    <li>Put the gate that plugs into the computer on the left-hand track. Join its LINK OUT to the next gate's LINK IN with a patch cable, and so on to the right.</li>
+    <li>Each track's start gate switch plugs into its own gate's GATE socket.</li>
+    <li>Plug the computer into the left-hand gate only: it powers the others. Its <code>N</code> answer shows every lane (<code>numl=9</code> for three tracks); set that many lanes in the race software.</li>
+    <li>Run the same car down each track a few times and compare, before the first heat.</li>
+  </ol>
+  <div class="note">The link sockets aren't network ports. Plugging one into a router by mistake does no harm (it just won't link), but never plug one into a passive PoE injector.</div>
 </section>
 
 </body>
