@@ -6,7 +6,7 @@
 //
 // Render one part with:  openscad -D 'part="left"' -o left.stl finish-gate.scad   (see build.sh)
 // part = "assembly" (preview only), "left", "right", "cover", "mx_blank", "led_lens", "sensor_bar",
-//        "link_in", "link_out" (the RJ45 link sockets' faceplates)
+//        "panel_left", "panel_right" (the faceplates for the sockets on the back of the legs)
 //
 // Axes: X across the track (0 = the board's left edge, looking down the track towards the finish),
 // Y along it (0 = the finish line, negative = up-track, towards the start), Z up (0 = the race surface,
@@ -99,18 +99,27 @@ usb_cut = [9.2, 13.8];            // the hole the body goes through (y, z)
 usb_screw = 10;                   // the screws, above and below the centre
 usb_body = 40.5;
 
-// ------------------------------------------------------------------ The links (RJ45, built into the legs)
-// Gates link with ordinary network patch cables. Each link socket is a standard RJ45 keystone jack, set into
-// the back of a leg behind a small faceplate that sits flush with it: LINK IN on the left leg, LINK OUT on
-// the right. The jack snaps into the faceplate, its body goes into a pocket in the leg (which opens into the
-// leg's cable channel), and two countersunk screws hold the plate. A short lead goes up the channel to the
-// board's link socket.
-ks_open = [14.8, 16.4];           // the keystone opening (across, up): the jack snaps in from behind
-ks_plate = [21, 36, 2.2];         // the faceplate (across, up, thick): keystones suit 1.5-2.3 mm panels
-ks_fit = 0.2;                     // clearance round the plate in its recess
-ks_cav = [18.5, 23, 33];          // the pocket for the jack's body behind the plate (across, up, in)
-ks_z = 30;                        // the middle of the socket, above the race surface
-ks_screw = 15;                    // the plate's two screws, above and below the middle (M3 x 10 countersunk)
+// ------------------------------------------------------------------ Sockets on the back of the legs
+// Everything plugged in at setup goes into sockets set into the back of the legs, behind a faceplate that
+// sits flush with the leg. Each socket's body sits in its own pocket inside the leg, which opens into the
+// leg's cable channel, where its lead goes up to the board.
+//   left leg, from the bottom: SENSORS (the sensor bar's lead: a GX12 2-pin locking connector),
+//                              START (the start gate: an RJ11 keystone jack, for a phone extension cable),
+//                              LINK IN (an RJ45 keystone jack, for a network patch cable)
+//   right leg:                 LINK OUT (RJ45)
+// Different connectors for SENSORS (which carries 5V) and START (a switch), so the start gate can't be
+// plugged into the 5V and short it.
+ks_open = [14.8, 16.4];           // a keystone opening (across, up): the jack snaps in from behind
+ks_cav = [18.5, 23, 33];          // the pocket for a keystone jack's body (across, up, in)
+gx_hole = 12.3;                   // GX12: an M12 panel connector, held by its nut behind the plate
+gx_cav = [17.5, 25];              // its pocket (across its nut, in)
+pl_w = 21;                        // faceplate width (the leg is 24)
+pl_t = 2.2;                       // faceplate thickness (keystones suit 1.5-2.3 mm panels)
+pl_fit = 0.2;                     // clearance round the plate in its recess
+// Each plate: its sockets [kind, middle z, label] (labels under each socket), its bottom and top, and its
+// two screws (M3 x 10 countersunk self-tapping, into the leg)
+left_panel = [[["gx", 26, "SENSORS"], ["ks", 55, "START"], ["ks", 85, "LINK IN"]], [7.5, 102], [11, 98.5]];
+right_panel = [[["ks", 85, "LINK OUT"]], [65.5, 102], [69, 98.5]];
 
 // ================================================================== Helpers
 module rbox(size, r) {            // a box with rounded vertical edges, from the origin
@@ -265,17 +274,22 @@ module leg_channels() {
         translate([cx - 6.5, 0, -8]) cube([13, beam_d, 9]);
     }
 }
-// Each leg's back: a recess for the faceplate (flush), the pocket for the jack behind it, and the screws'
-// pilot holes. The pocket runs into the leg's cable channel, where the jack's lead goes up to the board.
-module link_holes() {
-    for (cx = [x0 + leg_w / 2, x1 - leg_w / 2]) {
-        translate([cx - ks_plate[0] / 2 - ks_fit, beam_d / 2 - ks_plate[2], ks_z - ks_plate[1] / 2 - ks_fit])
-            cube([ks_plate[0] + 2 * ks_fit, ks_plate[2] + 1, ks_plate[1] + 2 * ks_fit]);
-        translate([cx - ks_cav[0] / 2, beam_d / 2 - ks_plate[2] - ks_cav[2], ks_z - ks_cav[1] / 2])
+// Each leg's back: a recess for its faceplate (flush), a pocket behind each socket, and the screws' pilots
+module panel_holes(cx, panel) {
+    span = panel[1];
+    translate([cx - pl_w / 2 - pl_fit, beam_d / 2 - pl_t, span[0] - pl_fit])
+        cube([pl_w + 2 * pl_fit, pl_t + 1, span[1] - span[0] + 2 * pl_fit]);
+    for (it = panel[0]) {
+        if (it[0] == "ks") translate([cx - ks_cav[0] / 2, beam_d / 2 - pl_t - ks_cav[2], it[1] - ks_cav[1] / 2])
             cube([ks_cav[0], ks_cav[2] + 0.01, ks_cav[1]]);
-        for (dz = [-ks_screw, ks_screw]) translate([cx, beam_d / 2 - ks_plate[2] - 8, ks_z + dz])
-            rotate([-90, 0, 0]) cylinder(d = 2.5, h = 8.01);
+        if (it[0] == "gx") translate([cx, beam_d / 2 - pl_t + 0.01, it[1]]) rotate([90, 0, 0])
+            cylinder(d = gx_cav[0], h = gx_cav[1]);
     }
+    for (z = panel[2]) translate([cx, beam_d / 2 - pl_t - 8, z]) rotate([-90, 0, 0]) cylinder(d = 2.5, h = 8.01);
+}
+module link_holes() {
+    panel_holes(x0 + leg_w / 2, left_panel);
+    panel_holes(x1 - leg_w / 2, right_panel);
 }
 
 module gantry() {
@@ -404,28 +418,30 @@ module track_preview() {
     color("SteelBlue") translate([lanes[1] - 33, -150, 10]) cube([66, 178, 30]);
 }
 
-// ================================================================== The link faceplates
-// Drawn as fitted on the left leg's back (its face at y = beam_d / 2), facing +y
-module link_plate(label) {
-    cx = x0 + leg_w / 2;
+// ================================================================== The faceplates
+// Drawn as fitted on a leg's back (its face at y = beam_d / 2, the plate's middle at x = cx), facing +y
+module panel_plate(cx, panel) {
+    span = panel[1];
     difference() {
-        translate([cx - ks_plate[0] / 2, beam_d / 2 - ks_plate[2], ks_z - ks_plate[1] / 2])
-            cube([ks_plate[0], ks_plate[2], ks_plate[1]]);
-        translate([cx - ks_open[0] / 2, beam_d / 2 - ks_plate[2] - 1, ks_z - ks_open[1] / 2 + 2.5])
-            cube([ks_open[0], ks_plate[2] + 2, ks_open[1]]);
-        for (dz = [-ks_screw, ks_screw]) translate([cx, beam_d / 2 + 0.01, ks_z + dz]) rotate([90, 0, 0]) {
-            cylinder(d1 = 6.2, d2 = 3.4, h = 1.6);
-            cylinder(d = 3.4, h = ks_plate[2] + 1);
+        translate([cx - pl_w / 2, beam_d / 2 - pl_t, span[0]]) cube([pl_w, pl_t, span[1] - span[0]]);
+        for (it = panel[0]) {
+            if (it[0] == "ks") translate([cx - ks_open[0] / 2, beam_d / 2 - pl_t - 1, it[1] - ks_open[1] / 2])
+                cube([ks_open[0], pl_t + 2, ks_open[1]]);
+            if (it[0] == "gx") translate([cx, beam_d / 2 + 1, it[1]]) rotate([90, 0, 0]) cylinder(d = gx_hole, h = pl_t + 2);
+            // its name, engraved under it
+            dz = it[0] == "ks" ? ks_open[1] / 2 + 2.6 : gx_hole / 2 + 2.6;
+            translate([cx, beam_d / 2 - 0.5, it[1] - dz]) rotate([90, 0, 180]) linear_extrude(1)
+                text(it[2], size = 2.6, font = "Liberation Sans:style=Bold", halign = "center", valign = "center");
         }
-        // its name, engraved under the opening
-        translate([cx, beam_d / 2 - 0.5, ks_z - ks_open[1] / 2 - 1.7]) rotate([90, 0, 180]) linear_extrude(1)
-            text(label, size = 2.6, font = "Liberation Sans:style=Bold", halign = "center", valign = "center");
+        for (z = panel[2]) translate([cx, beam_d / 2 + 0.01, z]) rotate([90, 0, 0]) {
+            cylinder(d1 = 6.2, d2 = 3.4, h = 1.6);
+            cylinder(d = 3.4, h = pl_t + 1);
+        }
     }
 }
-// Fitted: LINK IN on the left leg, LINK OUT on the right
-module link_plates() {
-    link_plate("LINK IN");
-    translate([x1 - leg_w - x0, 0, 0]) link_plate("LINK OUT");
+module panel_plates() {
+    panel_plate(x0 + leg_w / 2, left_panel);
+    panel_plate(x1 - leg_w / 2, right_panel);
 }
 
 // ================================================================== Output
@@ -440,7 +456,7 @@ if (part == "assembly") {
     color("White") { l = pcb_xy(pcb_led); translate([l[0], l[1], beam_z1 + cover_t - 7]) led_lens(); }
     usb_socket();
     color("Orange") sensor_bar();
-    color("DimGray") link_plates();
+    color("DimGray") panel_plates();
 }
 // Print orientations: the gantry halves lie on their backs, chequers up; the cover prints upside down
 // (its deck on the bed)
@@ -452,16 +468,23 @@ if (part == "led_lens") led_lens();
 // the bar prints standing on its underside; at 306 mm long, lay it diagonally on a 256 mm bed
 if (part == "sensor_bar") translate([0, 0, -bar_bot]) sensor_bar();
 // the link faceplates print face down
-if (part == "link_in") rotate([-90, 0, 0]) translate([0, -beam_d / 2, 0]) link_plate("LINK IN");
-if (part == "link_out") rotate([-90, 0, 0]) translate([0, -beam_d / 2, 0]) link_plate("LINK OUT");
+if (part == "panel_left") rotate([-90, 0, 0]) translate([0, -beam_d / 2, 0]) panel_plate(0, left_panel);
+if (part == "panel_right") rotate([-90, 0, 0]) translate([0, -beam_d / 2, 0]) panel_plate(0, right_panel);
 
 // The back of the gate: the link brackets on the legs
 if (part == "links") {
     color("Gold") left_half();
     color("Orange") right_half();
     color("DimGray") cover();
-    color("DimGray") link_plates();
-    color("Black") for (cx = [x0 + leg_w / 2, x1 - leg_w / 2]) translate([cx - 6, beam_d / 2 - 1.5, ks_z - 5]) cube([12, 1, 10]);
+    color("DimGray") panel_plates();
+    // what shows through the openings: the jacks' fronts, and the GX12's face
+    color("Black") for (pc = [[x0 + leg_w / 2, left_panel], [x1 - leg_w / 2, right_panel]], it = pc[1][0]) {
+        if (it[0] == "ks") translate([pc[0] - 7, beam_d / 2 - 1.5, it[1] - 7.8]) cube([14, 1, 15.6]);
+        if (it[0] == "gx") translate([pc[0], beam_d / 2 + 2.5, it[1]]) rotate([90, 0, 0]) difference() {
+            cylinder(d = 12, h = 3);
+            for (a = [0, 180]) rotate([0, 0, a]) translate([2.5, 0, 1]) cylinder(d = 1.6, h = 3);
+        }
+    }
     color("BurlyWood", 0.6) translate([0, -60, -board_t]) cube([track_w, 200, board_t]);
 }
 

@@ -60,6 +60,9 @@ drops: a microswitch or magnetic reed switch that the gate presses or holds. Tha
 
 The timer won't get ready with the gate open (it replies `O`), so a race can't start by accident.
 
+With the [finish gate](../hardware/gate#the-sockets-on-the-back-of-the-legs), the start gate plugs into the
+**START** socket on the back of the left leg (RJ11, middle pair) with an ordinary phone extension cable.
+
 ## Reset button (RESET)
 
 A 2-pin socket for the button: the [finish gate](../hardware/gate)'s MX key, or any push-to-make button

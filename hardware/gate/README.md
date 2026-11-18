@@ -43,7 +43,7 @@ padded board across the end).
 | `stl/cover.stl` | 1 | the top cover over the board (204 × 40 mm); prints upside down. MX switch socket and status light window |
 | `stl/mx_blank.stl` | 1 | fills the switch socket if you don't fit a key |
 | `stl/led_lens.stl` | 1 | print in white or clear; pushes into the status light window |
-| `stl/link_in.stl`, `stl/link_out.stl` | 1 each | only to [link gates](#linking-gates): the faceplates for the RJ45 link sockets, set into the back of the legs. Print face down |
+| `stl/panel_left.stl`, `stl/panel_right.stl` | 1 each | the faceplates for the [sockets](#the-sockets-on-the-back-of-the-legs) on the back of the legs (left: SENSORS, START, LINK IN; right: LINK OUT). Print face down |
 | `stl/sensor_bar.stl` | 1 | under the track: the three emitters, and a dovetail into each leg. 307 × 30 mm: lay it diagonally on a 256 × 256 mm bed |
 | `stl/drill_jig_left.stl` | 1 | drilling jig for lanes 1 and 2 (167 × 217 mm on the bed). Only needed once, to drill the track |
 | `stl/drill_jig_right.stl` | 1 | drilling jig for lane 3 (69 × 217 mm) |
@@ -65,8 +65,10 @@ the chequers and FINISH start (at 40.0 mm).
 | 2 | M4 × 16 bolts and M4 nuts | the thumbscrews: the nuts press into the underside of the bar's ends, and the bolts screw up against the board until snug |
 | 1 | MX switch (any) and a 1u keycap | optional: the button |
 | 1 | Adafruit panel-mount USB-C to Micro-B cable (ADA4056), with its two M3 screws | optional: USB-C on the right leg |
-| 2 | RJ45 keystone jacks, Cat5e or Cat6, unshielded (punch-down or tool-less) | optional: the link sockets |
-| 4 | M3 × 10 countersunk self-tapping screws | the link faceplates |
+| 1 | GX12 2-pin panel socket and plug | the SENSORS socket, and the sensor bar's plug |
+| 1 | RJ11 keystone jack (6P4C), and an RJ11 phone socket for the start gate | the START socket |
+| 2 | RJ45 keystone jacks, Cat5e or Cat6, unshielded (punch-down or tool-less) | LINK IN and LINK OUT (only to link gates) |
+| 4 | M3 × 10 countersunk self-tapping screws | the faceplates |
 
 ## Sensors: will they fit?
 
@@ -95,12 +97,9 @@ receivers face the track, not the hall's lights or a sunny window.
 One solid piece. Each emitter goes into its pocket from underneath, LED face up, and is screwed in with
 its M2 screw. Its cable leaves the pocket's left end into a groove along the underside of the bar. Emitters
 only need power, so join all three in the groove (reds together, blacks together) into one 2-core lead,
-and tape over the groove to keep the wires in. The lead leaves the left end and goes up the left leg (in
-at the slot at the back of the leg) and along the beam to the board.
-
-At the board, the lead plugs into the AUX header (J12): GND on pin 1, 5V on pin 3. A 3-way 2.54 mm housing
-over pins 1-3 with the middle left empty does it. Fit an inline 2-pin plug where the lead leaves the bar,
-so the bar comes off for packing without opening the cover.
+and tape over the groove to keep the wires in. The lead leaves the left end, with a GX12 plug on it, and
+plugs into the **SENSORS** socket on the back of the left leg (see [the sockets](#the-sockets-on-the-back-of-the-legs)),
+so the bar comes off for packing without opening anything.
 
 Each end of the bar is a dovetail that slides up into a matching socket in the leg. The socket is closed
 at the top, so the bar stops just under the board. An M3 pin through the leg and the dovetail locks it.
@@ -176,6 +175,43 @@ Above the board there's 20 mm to the cover. That's room for the upright resistor
 their plugs in, and the Pico on short headers; the MX key sits over the Pico. Solder the Pico flat or on
 2.5 mm headers, not on tall sockets.
 
+## The sockets on the back of the legs
+
+![The sockets on the back of the left leg](renders/link-sockets.png)
+
+Everything that's plugged in at setup goes into sockets set into the back of the legs, behind faceplates
+that sit flush with them. Each socket's body sits in its own pocket inside the leg, which opens into the
+leg's cable channel; a short lead goes from it up the channel and along the beam to the board, and stays
+there.
+
+| Socket | Where | Connector | Plug in | Inside, to the board |
+|---|---|---|---|---|
+| **SENSORS** | left leg, bottom | GX12 2-pin (an M12 locking "aviation" connector) | the sensor bar's lead | AUX (J12): pin 1 GND, pin 3 5V |
+| **START** | left leg, middle | RJ11 keystone jack (6P4C) | an ordinary phone extension cable from the start gate | GATE (J9) |
+| **LINK IN** | left leg, top | RJ45 keystone jack | a network patch cable from the gate on the left ([linking gates](#linking-gates)) | LINK IN (J13) |
+| **LINK OUT** | right leg | RJ45 keystone jack | a network patch cable to the gate on the right | LINK OUT (J14) |
+
+SENSORS (which carries 5V) and START (a switch) use different connectors, so the start gate can't be plugged
+into the 5V and short it.
+
+- **Faceplates:** `panel_left.stl` (three sockets) and `panel_right.stl` (one), printed face down. Each
+  socket's name is engraved under it.
+- **Fitting:** snap the keystone jacks into the faceplate from behind, and fit the GX12 socket through its
+  round hole with its nut behind. Make each one's lead (below), feed the leads into the pockets in the back
+  of the leg and up its channel to the board, push the sockets into their pockets until the faceplate sits
+  flush in its recess, and screw it in with two M3 × 10 countersunk self-tapping screws.
+- **Keystone jacks** vary a little: the pockets allow 33 mm behind the jack's front. The RJ11 jack is the
+  same keystone size as the RJ45 ones.
+
+**SENSORS lead:** from the GX12 socket's pins 1 and 2 to a 3-way 2.54 mm housing on the AUX header: pin 1
+(GND) and pin 3 (5V), with the middle empty. GX12 pin 1 is 5V, pin 2 GND. On the sensor bar's lead, fit the
+matching GX12 plug (pin 1 red, pin 2 black).
+
+**START lead:** from the RJ11 jack's middle pair (pins 3 and 4) to a 2-pin JST XH plug for GATE (J9). Which
+way round doesn't matter for a switch. At the start gate, fit a matching RJ11 socket (a surface-mount phone
+socket is fine) wired to the switch, so a phone extension cable joins the two. Phone cables come ready-made
+in 10 and 15 m lengths.
+
 ## Linking gates
 
 Tracks side by side each get a gate, and the gates [link](../../docs/wiring.md#linking-gates) into one
@@ -184,18 +220,11 @@ cables, from one gate's **LINK OUT** to the next gate's **LINK IN**.
 
 ![The link sockets on the back of the legs](renders/link-sockets.png)
 
-Each link socket is a standard RJ45 keystone jack (the snap-in kind for wall plates), built into the back
-of a leg behind a small faceplate that sits flush with it: **LINK IN** on the left leg, **LINK OUT** on the
-right. The jack's body sits in a pocket inside the leg, which opens into the leg's cable channel. Put the main gate
+The link sockets are RJ45 keystone jacks (the snap-in kind for wall plates) among the
+[sockets](#the-sockets-on-the-back-of-the-legs) on the back of the legs: **LINK IN** at the top of the left
+leg's faceplate, **LINK OUT** on the right leg's. Put the main gate
 (the one plugged into the computer) on the left-hand track, so the links run left to right. The main gate's
 USB powers the gates after it, so they don't need a USB lead.
-
-**Fitting a socket:** snap the jack into the faceplate from behind, its front out through the opening and
-its latch clicking over the edge. Feed the lead (below) into the pocket in the back of the leg, up the cable
-channel and along the beam to the board's link socket (LINK IN to J13, LINK OUT to J14). Push the jack into
-the pocket until the faceplate sits flush in its recess, and screw it in with two M3 × 10 countersunk
-self-tapping screws. Keystone jacks vary a little: if one is too long for the pocket (more than 33 mm
-behind its front), use a shorter one.
 
 Each jack joins the board's link socket by a short lead (about 40 cm: up the leg's channel and
 along the beam). Four wires, the same for LINK IN and LINK OUT; the jack's other pins stay empty:
@@ -224,9 +253,10 @@ plug a gate into a passive PoE injector (one that's always on), which puts 24-48
 3. Feed each receiver's cable up through its pod's end into the beam, then press the receiver into the
    pod, LED down, and screw it in with an M2 × 10.
 4. Screw the emitters into the sensor bar's pockets, LED up, join their wires in the groove into one
-   2-core lead out of the left end, tape the groove over, and fit the inline plug. Run the matching lead
-   from the board's AUX header (J12) along the beam and down the left leg's channel and out of the slot
-   at its back. The gate switch's cable comes in the same way.
+   2-core lead out of the left end, tape the groove over, and fit the GX12 plug. Fit the sockets into
+   the faceplates with their leads, run the leads up the legs' channels and along the beam, and screw the
+   faceplates on ([the sockets](#the-sockets-on-the-back-of-the-legs)). SENSORS goes to the AUX header
+   (J12), START to GATE (J9), the links to J13 and J14.
 5. Crimp each receiver to its lane's 4-pin JST XH plug: red to pin 4 (5V), black to pin 3 (GND), white
    to pin 2 (SIG), pin 1 empty. The emitters don't go to the lane plugs; they're powered by the bar's lead.
 6. Wire the MX switch's two pins to a 2-pin JST XH plug for the RESET socket (J10).
@@ -240,7 +270,8 @@ plug a gate into a passive PoE injector (one that's always on), which puts 24-48
 9. On the track: set the gate on the board at the finish line with its legs either side. From
    underneath, push the sensor bar up so its turrets go into the rail holes and its ends slide up into
    the legs' sockets, until it stops. Push the M3 pins through the legs and the bar, fit their nuts,
-   and tighten the thumbscrews up against the board. Plug in the bar's lead.
+   and tighten the thumbscrews up against the board. On the back of the left leg, plug the bar's lead into
+   SENSORS and the start gate's phone cable into START.
 
 The gate switch is at the far end of the track, about 9.7 m away, so its 2-core cable is long. That's
 fine for a switch to ground with the board's pull-up, but run it along the underside of the track, away

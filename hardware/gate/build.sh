@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 mkdir -p stl renders
-for p in left right cover mx_blank led_lens sensor_bar link_in link_out; do
+for p in left right cover mx_blank led_lens sensor_bar panel_left panel_right; do
   openscad -D "part=\"$p\"" -o "stl/$p.stl" finish-gate.scad
 done
 for p in jig_left jig_right bush; do
@@ -25,5 +25,5 @@ eval $RUN openscad -o renders/gate-exploded.png -D "'part=\"exploded\"'" --imgsi
   --camera=150,0,80,62,0,328,1000 --projection=p finish-gate.scad
 eval $RUN openscad -o renders/drill-jig.png --imgsize=1600,1000 --colorscheme=Tomorrow \
   --camera=150,70,0,50,0,20,640 --projection=p drill-jig.scad
-eval $RUN openscad -o renders/link-sockets.png -D "'part=\"links\"'" --imgsize=1600,1000 --colorscheme=Tomorrow \
-  --camera=-12,20,30,70,0,200,230 --projection=p finish-gate.scad
+eval $RUN openscad -o renders/link-sockets.png -D "'part=\"links\"'" --imgsize=1300,1300 --colorscheme=Tomorrow \
+  --camera=-12,20,55,70,0,200,330 --projection=p finish-gate.scad
