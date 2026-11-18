@@ -143,9 +143,11 @@ from its own start gate. Unlinked, each one is a timer on its own.
                   lanes 1-3                         lanes 4-6                          lanes 7-9
 ```
 
-- **Cables:** a straight 4-core cable from one gate's LINK OUT to the next gate's LINK IN, a 4-pin JST XH
-  plug at each end, pin 1 to pin 1 and so on. The board crosses the data over, so no special cable is
-  needed. 1 to 2 m is plenty between tracks side by side; keep it under about 5 m.
+- **Cables:** an ordinary network patch cable (RJ45, Cat5e or Cat6) from one gate's LINK OUT to the next
+  gate's LINK IN, plugged into the [gate's](../hardware/gate#linking-gates) RJ45 link sockets. Any length
+  that reaches; 1 to 2 m is plenty between tracks side by side, and up to about 10 m should be fine. (A
+  "crossover" cable won't link, and does no harm.) Without the gate's RJ45 sockets, a straight 4-core cable
+  with a 4-pin JST XH plug at each end, pin 1 to pin 1, plugs straight into the boards.
 - **The main gate** is the one with nothing on its LINK IN: plug the computer into it. The others don't need
   USB. The main gate powers them down the link (about 0.1 A a gate with three lanes of break-beam sensors).
 - **Lane numbers follow the cables.** The gate on the main gate's LINK OUT has the next lanes, and so on.
@@ -158,5 +160,25 @@ from its own start gate. Unlinked, each one is a timer on its own.
 | 2 | GND | GND |
 | 3 | data in (GP13) | data out (GP8) |
 | 4 | data out (GP12) | data in (GP9) |
+
+### The RJ45 link sockets
+
+Each bracket's jack joins the board's link socket by a short lead (about 40 cm: up the leg's channel and
+along the beam). Four wires, the same for LINK IN and LINK OUT; the jack's other pins stay empty:
+
+| Board link socket (JST XH) | RJ45 jack pin | T568B colour |
+|---|---|---|
+| 1 (5V) | 4 | blue |
+| 2 (GND) | 7 | white-brown |
+| 3 | 1 | white-orange |
+| 4 | 3 | white-green |
+
+A length cut from a patch cable makes a good lead: punch its colours down on the jack by the T568B labels
+(or click them into a tool-less jack), crimp the four above into a 4-pin JST XH plug, and cut the other four
+back.
+
+Wired this way, plugging a gate into a router or a laptop's network port by mistake does no harm: a network
+port joins only the two wires of a pair, and each pair here has one wire connected. It just won't link. Never
+plug a gate into a passive PoE injector (one that's always on), which puts 24-48 V on the cable.
 
 How the main gate and the race software see it is in [the protocol](protocol.md#linked-gates).

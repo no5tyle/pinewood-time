@@ -43,6 +43,7 @@ padded board across the end).
 | `stl/cover.stl` | 1 | the top cover over the board (204 × 40 mm); prints upside down. MX switch socket and status light window |
 | `stl/mx_blank.stl` | 1 | fills the switch socket if you don't fit a key |
 | `stl/led_lens.stl` | 1 | print in white or clear; pushes into the status light window |
+| `stl/link_in.stl`, `stl/link_out.stl` | 1 each | only to [link gates](#linking-gates): the brackets for the RJ45 link sockets, on the back of the legs. Print standing on the tabs |
 | `stl/sensor_bar.stl` | 1 | under the track: the three emitters, and a dovetail into each leg. 307 × 30 mm: lay it diagonally on a 256 × 256 mm bed |
 | `stl/drill_jig_left.stl` | 1 | drilling jig for lanes 1 and 2 (167 × 217 mm on the bed). Only needed once, to drill the track |
 | `stl/drill_jig_right.stl` | 1 | drilling jig for lane 3 (69 × 217 mm) |
@@ -64,6 +65,8 @@ the chequers and FINISH start (at 40.0 mm).
 | 2 | M4 × 16 bolts and M4 nuts | the thumbscrews: the nuts press into the underside of the bar's ends, and the bolts screw up against the board until snug |
 | 1 | MX switch (any) and a 1u keycap | optional: the button |
 | 1 | Adafruit panel-mount USB-C to Micro-B cable (ADA4056), with its two M3 screws | optional: USB-C on the right leg |
+| 2 | RJ45 keystone jacks, Cat5e or Cat6, unshielded (punch-down or tool-less) | optional: the link sockets |
+| 4 | M3 × 12 self-tapping screws | the link brackets, into the backs of the legs |
 
 ## Sensors: will they fit?
 
@@ -176,16 +179,39 @@ their plugs in, and the Pico on short headers; the MX key sits over the Pico. So
 ## Linking gates
 
 Tracks side by side each get a gate, and the gates [link](../../docs/wiring.md#linking-gates) into one
-timer: every gate is printed and built the same. Put the main gate (the one plugged into the computer) on the
-left-hand track, so the links run left to right:
+timer: every gate is printed and built the same. On race day, joining them is just ordinary network patch
+cables, from one gate's **LINK OUT** to the next gate's **LINK IN**.
 
-- **LINK IN** (from the gate on the left): its cable comes in at the slot at the back of the left leg and up
-  the left leg's channel, with the emitter lead and the start gate cable.
-- **LINK OUT** (to the gate on the right): its cable goes down the right leg's channel and out of the slot
-  at its back, beside the USB lead.
+![The link sockets on the back of the legs](renders/link-sockets.png)
 
-Both sockets are in the middle of the board, so the cables run along the beam under it. The main gate's USB
-powers the gates after it, so they don't need a USB lead.
+Each link socket is a standard RJ45 keystone jack (the snap-in kind for wall plates) in a printed bracket
+that screws to the back of a leg: **LINK IN** on the left leg, **LINK OUT** on the right. Put the main gate
+(the one plugged into the computer) on the left-hand track, so the links run left to right. The main gate's
+USB powers the gates after it, so they don't need a USB lead.
+
+**Fitting a bracket:** snap the jack into the bracket from the open side, its front out through the opening
+and its latch clicking over the edge. Feed the lead (below) through the hole in the back of the leg into its
+cable channel, up the leg and along the beam to the board's link socket (LINK IN to J13, LINK OUT to J14).
+Then screw the bracket to the leg with two M3 × 12 self-tapping screws, into the pilot holes above and below
+the hole.
+
+Each bracket's jack joins the board's link socket by a short lead (about 40 cm: up the leg's channel and
+along the beam). Four wires, the same for LINK IN and LINK OUT; the jack's other pins stay empty:
+
+| Board link socket (JST XH) | RJ45 jack pin | T568B colour |
+|---|---|---|
+| 1 (5V) | 4 | blue |
+| 2 (GND) | 7 | white-brown |
+| 3 | 1 | white-orange |
+| 4 | 3 | white-green |
+
+A length cut from a patch cable makes a good lead: punch its colours down on the jack by the T568B labels
+(or click them into a tool-less jack), crimp the four above into a 4-pin JST XH plug, and cut the other four
+back.
+
+Wired this way, plugging a gate into a router or a laptop's network port by mistake does no harm: a network
+port joins only the two wires of a pair, and each pair here has one wire connected. It just won't link. Never
+plug a gate into a passive PoE injector (one that's always on), which puts 24-48 V on the cable.
 
 ## Assembly
 
