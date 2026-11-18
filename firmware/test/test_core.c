@@ -44,8 +44,8 @@ static pt_timer timer4(void) {
     return t;
 }
 
-static const pt_inputs closed = {.gate_open = false, .lane_raw = 0};
-static const pt_inputs open_gate = {.gate_open = true, .lane_raw = 0};
+static const pt_inputs closed = {.gates_open = 0, .lane_raw = 0};
+static const pt_inputs open_gate = {.gates_open = 1, .lane_raw = 0};
 
 static void test_power_on_and_reset(void) {
     pt_timer t = timer4();
@@ -65,7 +65,7 @@ static void test_a_race(void) {
     pt_timer t = timer4();
     send(&t, "R", &closed);
     clear();
-    pt_gate_tripped(&t, 1000000);
+    pt_gate_tripped(&t, 0, 1000000);
     EXPECT_STR(out, "B\r\n");
     clear();
     pt_lane_tripped(&t, 2, 1000000 + 2345650); /* lane 3 first */
@@ -90,7 +90,7 @@ static void test_masked_lanes_and_forced_end(void) {
     EXPECT_STR(out, ".\r\n.\r\n");
     EXPECT(t.mask == 0x0A);
     clear();
-    pt_gate_tripped(&t, 0);
+    pt_gate_tripped(&t, 0, 0);
     pt_lane_tripped(&t, 1, 1500000); /* masked: ignored */
     pt_lane_tripped(&t, 0, 2000000);
     EXPECT_STR(out, "B\r\n"); /* still waiting for lane 3 */
@@ -107,7 +107,7 @@ static void test_masked_race_finishes_when_the_rest_are_in(void) {
     pt_timer t = timer4();
     send(&t, "RM3M4", &closed);
     clear();
-    pt_gate_tripped(&t, 0);
+    pt_gate_tripped(&t, 0, 0);
     pt_lane_tripped(&t, 0, 2100000);
     pt_lane_tripped(&t, 1, 2200000);
     EXPECT_STR(out, "B\r\n1 - 2.1000\r\n2 - 2.2000\r\n3 - 99.9990\r\n4 - 99.9990\r\n");
@@ -116,7 +116,7 @@ static void test_masked_race_finishes_when_the_rest_are_in(void) {
 static void test_reset_mid_race_ends_it_then_rearms(void) {
     pt_timer t = timer4();
     send(&t, "R", &closed);
-    pt_gate_tripped(&t, 0);
+    pt_gate_tripped(&t, 0, 0);
     pt_lane_tripped(&t, 0, 2500000);
     clear();
     send(&t, "R", &closed);
@@ -131,7 +131,7 @@ static void test_reset_mid_race_ends_it_then_rearms(void) {
 static void test_gate_ignored_unless_ready(void) {
     pt_timer t = timer4();
     clear();
-    pt_gate_tripped(&t, 5); /* not reset yet */
+    pt_gate_tripped(&t, 0, 5); /* not reset yet */
     pt_lane_tripped(&t, 0, 10);
     EXPECT_STR(out, "");
     EXPECT(t.mode == PT_INIT);
@@ -152,7 +152,7 @@ static void test_queries(void) {
     send(&t, "G\r\n", &closed); /* line endings after a command are ignored */
     EXPECT_STR(out, ".\r\n");
     clear();
-    pt_inputs in = {.gate_open = false, .lane_raw = 0x05};
+    pt_inputs in = {.gates_open = 0, .lane_raw = 0x05};
     send(&t, "T", &in);
     EXPECT_STR(out, "lanes 1010\r\n");
 }
@@ -164,7 +164,7 @@ static void test_settings(void) {
     EXPECT_STR(out, ".\r\n");
     EXPECT(t.cfg.num_lanes == 6 && t.config_changed);
     clear();
-    send(&t, "#lanes 9\n", &closed);
+    send(&t, "#lanes 13\n", &closed);
     EXPECT_STR(out, "?\r\n");
     EXPECT(t.cfg.num_lanes == 6);
     send(&t, "#lane-trip low\n#gate-trip low\n#brightness 12\n", &closed);
@@ -190,7 +190,7 @@ static void test_formatting(void) {
     EXPECT_STR(s, "----");
     pt_timer t = timer4();
     send(&t, "R", &closed);
-    pt_gate_tripped(&t, 0);
+    pt_gate_tripped(&t, 0, 0);
     pt_lane_tripped(&t, 0, 100000000); /* 100 s or more: no time */
     pt_format_result(&t, 0, s, sizeof s);
     EXPECT_STR(s, "1 - 99.9990");
@@ -200,7 +200,7 @@ static void test_mode_test(void) {
     pt_timer t = timer4();
     clear();
     pt_enter_test(&t);
-    pt_inputs in = {.gate_open = true, .lane_raw = 0x09};
+    pt_inputs in = {.gates_open = 1, .lane_raw = 0x09};
     pt_test_report(&t, &in);
     EXPECT_STR(out, "TEST MODE\r\ntest lanes=1..1 gate=open\r\n");
     clear();
@@ -215,7 +215,7 @@ static void test_button_reset_mode(void) {
     EXPECT_STR(out, "K\r\n"); /* default: the button resets */
     EXPECT(t.mode == PT_READY);
     EXPECT(t.key_to_press == 0);
-    pt_gate_tripped(&t, 1000);
+    pt_gate_tripped(&t, 0, 1000);
     clear();
     pt_button(&t, &closed, true); /* mid-race: ends it */
     EXPECT(t.mode == PT_FINISH);
@@ -230,7 +230,7 @@ static void test_button_next_mode(void) {
     EXPECT(t.cfg.button_next);
     EXPECT(t.cfg.button_key == 0x28); /* enter, by default */
     send(&t, "R", &closed);
-    pt_gate_tripped(&t, 1000);
+    pt_gate_tripped(&t, 0, 1000);
     pt_lane_tripped(&t, 0, 2001000);
     clear();
     pt_button(&t, &closed, true); /* racing: still ends the race */
@@ -284,6 +284,123 @@ static void test_button_key_setting(void) {
     EXPECT(strstr(out, " button next, key pagedown\r\n") != NULL);
 }
 
+
+/* ---------------------------------------------------------------- Several tracks, a start gate each */
+static pt_timer timer_tracks(void) { /* 12 lanes, four 3-lane tracks */
+    pt_timer t;
+    pt_config c = pt_default_config();
+    c.num_lanes = 12;
+    clear();
+    pt_init(&t, &c, capture, NULL);
+    send(&t, "#gate2 4-6\n#gate3 7-9\n#gate4 10-12\n", &closed);
+    clear();
+    return t;
+}
+
+static void test_one_gate_by_default(void) {
+    pt_config c = pt_default_config();
+    c.num_lanes = 12;
+    EXPECT(pt_gates_in_use(&c) == 1);
+    for (int lane = 0; lane < PT_MAX_LANES; lane++) EXPECT(c.lane_gate[lane] == 0);
+    /* the spare gates being "open" (nothing plugged in) doesn't matter while no lane uses them */
+    pt_timer t;
+    clear();
+    pt_init(&t, &c, capture, NULL);
+    pt_inputs spare_open = {.gates_open = 0x0E, .lane_raw = 0};
+    clear();
+    send(&t, "R", &spare_open);
+    EXPECT_STR(out, "K\r\n");
+    /* and they don't start anything */
+    clear();
+    pt_gate_tripped(&t, 1, 1000);
+    EXPECT_STR(out, "");
+    EXPECT(t.mode == PT_READY);
+}
+
+static void test_gate_settings(void) {
+    pt_timer t = timer_tracks();
+    EXPECT(pt_gates_in_use(&t.cfg) == 0x0F);
+    EXPECT(t.cfg.lane_gate[2] == 0 && t.cfg.lane_gate[3] == 1 && t.cfg.lane_gate[8] == 2 && t.cfg.lane_gate[11] == 3);
+    clear();
+    send(&t, "#gate2 4,5,7-8\n", &closed); /* lists and ranges; lanes move from gate 3 */
+    EXPECT_STR(out, ".\r\n");
+    EXPECT(t.cfg.lane_gate[3] == 1 && t.cfg.lane_gate[5] == 1 && t.cfg.lane_gate[6] == 1 && t.cfg.lane_gate[8] == 2);
+    clear();
+    send(&t, "#gate3 none\n", &closed); /* gate 3's lanes back to gate 1 */
+    EXPECT_STR(out, ".\r\n");
+    EXPECT(t.cfg.lane_gate[8] == 0 && t.cfg.lane_gate[6] == 1);
+    clear();
+    send(&t, "#gate5 1-3\n#gate2 0-3\n#gate2 4-13\n#gate2 6-4\n#gate2\n#gate1 none\n#gate2 4-x\n", &closed);
+    EXPECT_STR(out, "?\r\n?\r\n?\r\n?\r\n?\r\n?\r\n?\r\n");
+    clear();
+    send(&t, "#gate1 1-12\n", &closed); /* everything back on gate 1 */
+    EXPECT_STR(out, ".\r\n");
+    EXPECT(pt_gates_in_use(&t.cfg) == 1);
+    /* #info lists the gates when there's more than one */
+    t = timer_tracks();
+    send(&t, "#info\n", &closed);
+    EXPECT(strstr(out, " gate 1: lanes 1-3\r\n") && strstr(out, " gate 2: lanes 4-6\r\n") &&
+           strstr(out, " gate 4: lanes 10-12\r\n"));
+}
+
+static void test_race_from_four_gates(void) {
+    pt_timer t = timer_tracks();
+    pt_inputs gate3_open = {.gates_open = 0x04, .lane_raw = 0};
+    send(&t, "R", &gate3_open);
+    EXPECT_STR(out, "O\r\n"); /* any gate in use open: not ready */
+    clear();
+    send(&t, "G", &gate3_open);
+    EXPECT_STR(out, "O\r\n");
+    clear();
+    send(&t, "R", &closed);
+    EXPECT_STR(out, "K\r\n");
+    clear();
+    /* the gates drop a little apart; each track's cars are timed from their own gate */
+    pt_gate_tripped(&t, 1, 1000000);
+    EXPECT_STR(out, "B\r\n"); /* the first gate starts the race */
+    clear();
+    pt_lane_tripped(&t, 0, 1500000); /* lane 1 before gate 1 opened: not a finish */
+    pt_gate_tripped(&t, 0, 1002000);
+    pt_gate_tripped(&t, 2, 1004000);
+    pt_gate_tripped(&t, 3, 1010000);
+    pt_gate_tripped(&t, 1, 1500000); /* a gate opening twice: the first counts */
+    EXPECT_STR(out, "");
+    for (uint8_t lane = 0; lane < 12; lane++) {
+        uint64_t start[4] = {1002000, 1000000, 1004000, 1010000};
+        pt_lane_tripped(&t, lane, start[lane / 3] + 2500000 + lane * 1000u);
+    }
+    EXPECT_STR(out, "1 - 2.5000\r\n2 - 2.5010\r\n3 - 2.5020\r\n4 - 2.5030\r\n5 - 2.5040\r\n6 - 2.5050\r\n"
+                    "7 - 2.5060\r\n8 - 2.5070\r\n9 - 2.5080\r\n10 - 2.5090\r\n11 - 2.5100\r\n12 - 2.5110\r\n");
+    EXPECT(t.place[0] == 1 && t.place[11] == 12);
+}
+
+static void test_masks_beyond_nine(void) {
+    pt_timer t = timer_tracks();
+    send(&t, "MAMbMC", &closed); /* lanes 10 to 12 */
+    EXPECT(t.mask == 0x0E00);
+    send(&t, "U", &closed);
+    send(&t, "M:M<", &closed); /* the characters after '9' work too */
+    EXPECT(t.mask == 0x0A00);
+    /* with gate 4's lanes all masked, the race doesn't wait for them */
+    send(&t, "U", &closed);
+    send(&t, "MAMBMC", &closed);
+    send(&t, "R", &closed);
+    for (uint8_t g = 0; g < 3; g++) pt_gate_tripped(&t, g, 1000);
+    clear();
+    for (uint8_t lane = 0; lane < 9; lane++) pt_lane_tripped(&t, lane, 3000000);
+    EXPECT(t.mode == PT_FINISH);
+    EXPECT(strstr(out, "10 - 99.9990\r\n") != NULL);
+}
+
+static void test_mode_test_gates(void) {
+    pt_timer t = timer_tracks();
+    pt_enter_test(&t);
+    clear();
+    pt_inputs in = {.gates_open = 0x02, .lane_raw = 0x0801};
+    pt_test_report(&t, &in);
+    EXPECT_STR(out, "test lanes=1..........1 gates=1:closed,2:open,3:closed,4:closed\r\n");
+}
+
 int main(void) {
     test_power_on_and_reset();
     test_a_race();
@@ -298,6 +415,11 @@ int main(void) {
     test_button_reset_mode();
     test_button_next_mode();
     test_button_key_setting();
+    test_one_gate_by_default();
+    test_gate_settings();
+    test_race_from_four_gates();
+    test_masks_beyond_nine();
+    test_mode_test_gates();
     if (failures) {
         printf("%d failure(s)\n", failures);
         return 1;

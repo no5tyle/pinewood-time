@@ -3,10 +3,11 @@
  *
  * Talks to race software over USB (it shows up as a serial port, and a keyboard for the reset button's
  * "next heat" key: usb.c) using the PDT timer protocol. The timing
- * itself happens in an interrupt: each lane's beam break and the start gate opening are stamped with the
+ * itself happens in an interrupt: each lane's beam break and each start gate opening are stamped with the
  * Pico's microsecond clock the moment they happen, then handed to the timer core (timer_core.c).
  */
 #include <stdio.h>
+#include <string.h>
 
 #include "board.h"
 #include "display.h"
@@ -18,18 +19,20 @@
 
 /* ---------------------------------------------------------------- Events from the interrupt */
 typedef struct {
-    uint8_t kind; /* 0..7 = that lane, EVENT_GATE, EVENT_RESET */
+    uint8_t kind; /* 0..11 = that lane, EVENT_GATE + gate, EVENT_RESET */
     uint64_t at_us;
 } event;
 
-#define EVENT_GATE 0x10
-#define EVENT_RESET 0x11
+#define EVENT_GATE 0x10 /* 0x10 to 0x13: gates 1 to 4 */
+#define EVENT_RESET 0x20
 #define QUEUE_SIZE 64
 
 static volatile event queue[QUEUE_SIZE];
 static volatile uint32_t queue_head, queue_tail;
 static volatile uint64_t last_reset_us;
 static pt_config cfg;
+static const uint8_t gate_pins[PT_MAX_GATES] = {PIN_GATE, PIN_GATE_2, PIN_GATE_3, PIN_GATE_4};
+static uint8_t gates_used; /* the gates set up as inputs (bit 0 = gate 1) */
 
 static void push(uint8_t kind, uint64_t at_us) {
     uint32_t next = (queue_head + 1) % QUEUE_SIZE;
@@ -43,9 +46,15 @@ static void on_edge(uint gpio, uint32_t events) {
     uint64_t now = time_us_64(); /* first, so the time is when it happened */
     if (gpio < PIN_LANE_FIRST + PT_MAX_LANES) {
         push((uint8_t)(gpio - PIN_LANE_FIRST), now);
-    } else if (gpio == PIN_GATE) {
-        push(EVENT_GATE, now);
-    } else if (gpio == PIN_RESET && (events & GPIO_IRQ_EDGE_FALL)) {
+        return;
+    }
+    for (uint8_t g = 0; g < PT_MAX_GATES; g++) {
+        if (gpio == gate_pins[g] && (gates_used & (1u << g))) {
+            push((uint8_t)(EVENT_GATE + g), now);
+            return;
+        }
+    }
+    if (gpio == PIN_RESET && (events & GPIO_IRQ_EDGE_FALL)) {
         if (now - last_reset_us > 250000) { /* debounce the button */
             last_reset_us = now;
             push(EVENT_RESET, now);
@@ -68,11 +77,23 @@ static void set_up_inputs(void) {
         gpio_set_irq_enabled_with_callback(pin, lane < cfg.num_lanes ? trip_edge(cfg.lane_trip_high) : 0,
                                            lane < cfg.num_lanes, on_edge);
     }
-    gpio_init(PIN_GATE);
-    gpio_set_dir(PIN_GATE, GPIO_IN);
-    gpio_pull_up(PIN_GATE);
-    gpio_set_irq_enabled(PIN_GATE, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-    gpio_set_irq_enabled_with_callback(PIN_GATE, trip_edge(cfg.gate_trip_high), true, on_edge);
+    /* Gate 1 always; gates 2 to 4 (on the AUX pins) only when lanes are timed from them, so the AUX pins
+     * stay free otherwise */
+    gates_used = pt_gates_in_use(&cfg);
+    for (uint8_t g = 0; g < PT_MAX_GATES; g++) {
+        uint pin = gate_pins[g];
+        bool used = gates_used & (1u << g);
+        if (!used && g > 0) {
+            gpio_set_irq_enabled(pin, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+            continue;
+        }
+        gpio_init(pin);
+        gpio_set_dir(pin, GPIO_IN);
+        gpio_pull_up(pin); /* an unplugged gate reads as open, so the timer won't get ready */
+        gpio_set_input_hysteresis_enabled(pin, true);
+        gpio_set_irq_enabled(pin, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        gpio_set_irq_enabled_with_callback(pin, trip_edge(cfg.gate_trip_high), true, on_edge);
+    }
     gpio_init(PIN_RESET);
     gpio_set_dir(PIN_RESET, GPIO_IN);
     gpio_pull_up(PIN_RESET);
@@ -81,10 +102,10 @@ static void set_up_inputs(void) {
 
 static pt_inputs read_inputs(void) {
     uint32_t all = gpio_get_all();
-    pt_inputs in = {
-        .gate_open = (((all >> PIN_GATE) & 1u) != 0) == cfg.gate_trip_high,
-        .lane_raw = (uint8_t)((all >> PIN_LANE_FIRST) & 0xFFu),
-    };
+    pt_inputs in = {.gates_open = 0, .lane_raw = (uint16_t)((all >> PIN_LANE_FIRST) & ((1u << PT_MAX_LANES) - 1u))};
+    for (uint8_t g = 0; g < PT_MAX_GATES; g++)
+        if ((gates_used & (1u << g)) && ((((all >> gate_pins[g]) & 1u) != 0) == cfg.gate_trip_high))
+            in.gates_open |= (uint8_t)(1u << g);
     return in;
 }
 
@@ -131,8 +152,8 @@ static void show_lanes(const pt_timer *t, uint64_t now_us) {
     last = now_us;
     char text[8];
     for (uint8_t lane = 0; lane < t->cfg.num_lanes; lane++) {
-        if (!(displays & (1u << lane))) continue;
-        uint8_t bit = (uint8_t)(1u << lane);
+        if (lane >= 8 || !(displays & (1u << lane))) continue; /* displays for lanes 1 to 8 only */
+        uint16_t bit = (uint16_t)(1u << lane);
         if (t->mode == PT_TEST) {
             pt_inputs in = read_inputs();
             bool tripped = (((in.lane_raw >> lane) & 1u) != 0) == t->cfg.lane_trip_high;
@@ -141,7 +162,9 @@ static void show_lanes(const pt_timer *t, uint64_t now_us) {
             display_text(lane, "");
         } else if (t->mode == PT_RACING && !(t->finished & bit)) {
             /* running clock while the car is on the track */
-            pt_format_display((uint32_t)(now_us - t->start_us), true, text, sizeof text);
+            uint8_t gate = t->cfg.lane_gate[lane];
+            bool off = t->started & (1u << gate);
+            pt_format_display(off ? (uint32_t)(now_us - t->start_us[gate]) : 0, true, text, sizeof text);
             display_text(lane, text);
         } else if ((t->mode == PT_RACING || t->mode == PT_FINISH) && (t->finished & bit)) {
             /* the time, then (once the race is over) the place, swapping every 3 seconds */
@@ -186,8 +209,8 @@ int main(void) {
             queue_tail = (queue_tail + 1) % QUEUE_SIZE;
             if (e.kind < PT_MAX_LANES) {
                 pt_lane_tripped(&timer, e.kind, e.at_us);
-            } else if (e.kind == EVENT_GATE) {
-                pt_gate_tripped(&timer, e.at_us);
+            } else if (e.kind >= EVENT_GATE && e.kind < EVENT_GATE + PT_MAX_GATES) {
+                pt_gate_tripped(&timer, (uint8_t)(e.kind - EVENT_GATE), e.at_us);
             } else if (e.kind == EVENT_RESET) {
                 /* ends a race, leaves test mode, or resets / asks for the next heat (#button) */
                 if (pt_button(&timer, &in, usb_host_listening()) == PT_BUTTON_LEAVE_TEST)
@@ -208,7 +231,8 @@ int main(void) {
             timer.config_changed = false;
             bool inputs_changed = timer.cfg.num_lanes != cfg.num_lanes ||
                                   timer.cfg.lane_trip_high != cfg.lane_trip_high ||
-                                  timer.cfg.gate_trip_high != cfg.gate_trip_high;
+                                  timer.cfg.gate_trip_high != cfg.gate_trip_high ||
+                                  memcmp(timer.cfg.lane_gate, cfg.lane_gate, sizeof cfg.lane_gate) != 0;
             bool brightness_changed = timer.cfg.brightness != cfg.brightness;
             cfg = timer.cfg;
             if (inputs_changed) set_up_inputs();

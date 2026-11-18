@@ -35,13 +35,28 @@ static void debug(pt_timer *t, const char *text) {
     say_line(t, text);
 }
 
-static uint8_t all_lanes(const pt_timer *t) {
-    return (uint8_t)((1u << t->cfg.num_lanes) - 1u);
+static uint16_t all_lanes(const pt_timer *t) {
+    return (uint16_t)((1u << t->cfg.num_lanes) - 1u);
+}
+
+static uint16_t lane_bit(uint8_t lane) { return (uint16_t)(1u << lane); }
+
+uint8_t pt_gates_in_use(const pt_config *cfg) {
+    uint8_t gates = 1; /* gate 1 always: it's the start of a single track */
+    for (uint8_t lane = 0; lane < cfg->num_lanes && lane < PT_MAX_LANES; lane++)
+        if (cfg->lane_gate[lane] < PT_MAX_GATES) gates |= (uint8_t)(1u << cfg->lane_gate[lane]);
+    return gates;
+}
+
+/* Any gate in use open (can't get ready: that track's race would start at once) */
+static bool any_gate_open(const pt_timer *t, const pt_inputs *in) {
+    return in && (in->gates_open & pt_gates_in_use(&t->cfg));
 }
 
 pt_config pt_default_config(void) {
     pt_config c = {.num_lanes = 4, .lane_trip_high = true, .gate_trip_high = true, .brightness = 6,
                    .button_next = false, .button_key = 0x28 /* enter */};
+    /* every lane timed from gate 1: lane_gate is all zeros */
     return c;
 }
 
@@ -49,6 +64,8 @@ void pt_init(pt_timer *t, const pt_config *cfg, pt_write_fn write, void *ctx) {
     memset(t, 0, sizeof *t);
     t->cfg = *cfg;
     if (t->cfg.num_lanes < 1 || t->cfg.num_lanes > PT_MAX_LANES) t->cfg.num_lanes = 4;
+    for (uint8_t lane = 0; lane < PT_MAX_LANES; lane++)
+        if (t->cfg.lane_gate[lane] >= PT_MAX_GATES) t->cfg.lane_gate[lane] = 0;
     t->write = write;
     t->ctx = ctx;
     t->mode = PT_INIT;
@@ -57,15 +74,16 @@ void pt_init(pt_timer *t, const pt_config *cfg, pt_write_fn write, void *ctx) {
 
 static void clear_race(pt_timer *t) {
     t->finished = 0;
-    t->start_us = 0;
+    t->started = 0;
+    memset(t->start_us, 0, sizeof t->start_us);
     memset(t->lane_us, 0, sizeof t->lane_us);
     memset(t->place, 0, sizeof t->place);
 }
 
 void pt_reset(pt_timer *t, const pt_inputs *in) {
     if (t->mode == PT_TEST) return;
-    if (in && in->gate_open) {
-        /* Can't arm with the gate down: the race would start straight away */
+    if (any_gate_open(t, in)) {
+        /* Can't arm with a gate down: the race would start straight away */
         say_char(t, MSG_GATE_OPEN);
         return;
     }
@@ -79,12 +97,12 @@ static void work_out_places(pt_timer *t) {
     memset(t->place, 0, sizeof t->place);
     uint8_t place = 0;
     uint32_t last = 0;
-    uint8_t placed = 0;
+    uint16_t placed = 0;
     for (uint8_t n = 0; n < t->cfg.num_lanes; n++) {
         /* the fastest lane not yet placed */
         int best = -1;
         for (uint8_t lane = 0; lane < t->cfg.num_lanes; lane++) {
-            uint8_t bit = (uint8_t)(1u << lane);
+            uint16_t bit = lane_bit(lane);
             if (!(t->finished & bit) || (t->mask & bit) || (placed & bit)) continue;
             if (best < 0 || t->lane_us[lane] < t->lane_us[best]) best = lane;
         }
@@ -92,12 +110,12 @@ static void work_out_places(pt_timer *t) {
         if (place == 0 || t->lane_us[best] > last) place++;
         last = t->lane_us[best];
         t->place[best] = place;
-        placed |= (uint8_t)(1u << best);
+        placed |= lane_bit((uint8_t)best);
     }
 }
 
 static bool lane_has_time(const pt_timer *t, uint8_t lane) {
-    uint8_t bit = (uint8_t)(1u << lane);
+    uint16_t bit = lane_bit(lane);
     return (t->finished & bit) && !(t->mask & bit);
 }
 
@@ -144,21 +162,37 @@ static void finish(pt_timer *t) {
     send_results(t);
 }
 
-void pt_gate_tripped(pt_timer *t, uint64_t now_us) {
-    if (t->mode != PT_READY) return;
-    clear_race(t);
-    t->start_us = now_us;
-    t->mode = PT_RACING;
-    say_char(t, MSG_START);
+void pt_gate_tripped(pt_timer *t, uint8_t gate, uint64_t now_us) {
+    if (gate >= PT_MAX_GATES || !(pt_gates_in_use(&t->cfg) & (1u << gate))) return;
+    uint8_t gbit = (uint8_t)(1u << gate);
+    if (t->mode == PT_READY) {
+        /* the first gate to open starts the race */
+        clear_race(t);
+        t->mode = PT_RACING;
+        say_char(t, MSG_START);
+    } else if (t->mode != PT_RACING || (t->started & gbit)) {
+        return; /* not racing, or this gate has already opened */
+    }
+    t->started |= gbit;
+    t->start_us[gate] = now_us;
+    if (t->debug) {
+        char s[40];
+        snprintf(s, sizeof s, "gate %u open", (unsigned)(gate + 1));
+        debug(t, s);
+    }
     /* Lanes left out of this race count as already in, so the race doesn't wait for them */
-    if ((t->mask & all_lanes(t)) == all_lanes(t)) finish(t);
+    if (((t->finished | t->mask) & all_lanes(t)) == all_lanes(t)) finish(t);
 }
 
 void pt_lane_tripped(pt_timer *t, uint8_t lane, uint64_t now_us) {
     if (t->mode != PT_RACING || lane >= t->cfg.num_lanes) return;
-    uint8_t bit = (uint8_t)(1u << lane);
+    uint16_t bit = lane_bit(lane);
     if ((t->finished & bit) || (t->mask & bit)) return;
-    uint64_t elapsed = now_us > t->start_us ? now_us - t->start_us : 0;
+    uint8_t gate = t->cfg.lane_gate[lane];
+    /* a beam broken before its own gate opened isn't a car finishing (a hand, or a car pushed back) */
+    if (!(t->started & (1u << gate))) return;
+    uint64_t start = t->start_us[gate];
+    uint64_t elapsed = now_us > start ? now_us - start : 0;
     if (elapsed > 0xFFFFFFFFu) elapsed = 0xFFFFFFFFu;
     t->lane_us[lane] = (uint32_t)elapsed;
     t->finished |= bit;
@@ -181,7 +215,7 @@ void pt_enter_test(pt_timer *t) {
 }
 
 void pt_test_report(pt_timer *t, const pt_inputs *in) {
-    char s[48];
+    char s[80];
     int n = snprintf(s, sizeof s, "test lanes=");
     for (uint8_t lane = 0; lane < t->cfg.num_lanes && n < (int)sizeof s - 1; lane++) {
         bool high = (in->lane_raw >> lane) & 1u;
@@ -189,7 +223,19 @@ void pt_test_report(pt_timer *t, const pt_inputs *in) {
         s[n++] = tripped ? '1' : '.';
     }
     s[n] = 0;
-    snprintf(s + n, sizeof s - (size_t)n, " gate=%s", in->gate_open ? "open" : "closed");
+    uint8_t used = pt_gates_in_use(&t->cfg);
+    if (used == 1) {
+        snprintf(s + n, sizeof s - (size_t)n, " gate=%s", (in->gates_open & 1u) ? "open" : "closed");
+    } else {
+        n += snprintf(s + n, sizeof s - (size_t)n, " gates=");
+        bool first = true;
+        for (uint8_t g = 0; g < PT_MAX_GATES; g++) {
+            if (!(used & (1u << g))) continue;
+            n += snprintf(s + n, sizeof s - (size_t)n, "%s%u:%s", first ? "" : ",", (unsigned)(g + 1),
+                          ((in->gates_open >> g) & 1u) ? "open" : "closed");
+            first = false;
+        }
+    }
     say_line(t, s);
 }
 
@@ -256,6 +302,49 @@ pt_button_result pt_button(pt_timer *t, const pt_inputs *in, bool host_listening
     }
 }
 
+/* The lanes timed from a gate, as "4-6" or "1,3,5-6" */
+static void lanes_text(const pt_timer *t, uint8_t gate, char *out, int size) {
+    int n = 0;
+    out[0] = 0;
+    for (uint8_t lane = 0; lane < t->cfg.num_lanes;) {
+        if (t->cfg.lane_gate[lane] != gate) { lane++; continue; }
+        uint8_t end = lane;
+        while (end + 1 < t->cfg.num_lanes && t->cfg.lane_gate[end + 1] == gate) end++;
+        if (end == lane)
+            n += snprintf(out + n, (size_t)(size - n), "%s%u", n ? "," : "", (unsigned)(lane + 1));
+        else
+            n += snprintf(out + n, (size_t)(size - n), "%s%u-%u", n ? "," : "", (unsigned)(lane + 1),
+                          (unsigned)(end + 1));
+        if (n >= size) break;
+        lane = (uint8_t)(end + 1);
+    }
+    if (!out[0]) snprintf(out, (size_t)size, "none");
+}
+
+/* "4-6", "4,5,6", "1-3,7" or "none": which lanes (bit 0 = lane 1). False if it doesn't make sense */
+static bool parse_lanes(const char *text, uint16_t *lanes) {
+    *lanes = 0;
+    if (strcmp(text, "none") == 0) return true;
+    const char *p = text;
+    while (*p) {
+        char *end;
+        long a = strtol(p, &end, 10);
+        if (end == p || a < 1 || a > PT_MAX_LANES) return false;
+        long b = a;
+        p = end;
+        if (*p == '-') {
+            p++;
+            b = strtol(p, &end, 10);
+            if (end == p || b < a || b > PT_MAX_LANES) return false;
+            p = end;
+        }
+        for (long l = a; l <= b; l++) *lanes |= (uint16_t)(1u << (l - 1));
+        if (*p == ',') p++;
+        else if (*p) return false;
+    }
+    return *lanes != 0;
+}
+
 static void send_info(pt_timer *t) {
     char s[64];
     say_line(t, "-----------------------------");
@@ -267,6 +356,14 @@ static void send_info(pt_timer *t) {
     snprintf(s, sizeof s, " lane trip %s, gate trip %s", t->cfg.lane_trip_high ? "high" : "low",
              t->cfg.gate_trip_high ? "high" : "low");
     say_line(t, s);
+    uint8_t used = pt_gates_in_use(&t->cfg);
+    for (uint8_t g = 0; g < PT_MAX_GATES && used != 1; g++) {
+        if (!(used & (1u << g))) continue;
+        char lanes[32];
+        lanes_text(t, g, lanes, sizeof lanes);
+        snprintf(s, sizeof s, " gate %u: lanes %s", (unsigned)(g + 1), lanes);
+        say_line(t, s);
+    }
     snprintf(s, sizeof s, " display brightness %u", (unsigned)t->cfg.brightness);
     say_line(t, s);
     char key[8];
@@ -279,6 +376,7 @@ static void send_info(pt_timer *t) {
 }
 
 /* "#lanes 6", "#lane-trip low", "#gate-trip high", "#brightness 8", "#button next", "#button-key space",
+ * "#gate2 4-6" (lanes 4 to 6 timed from start gate 2; "#gate2 none" puts them back on gate 1),
  * "#save", "#info" */
 static void run_setting(pt_timer *t, char *line) {
     for (char *p = line; *p; p++) *p = (char)tolower((unsigned char)*p);
@@ -307,6 +405,18 @@ static void run_setting(pt_timer *t, char *line) {
         uint8_t code;
         if (pt_key_code(arg, &code)) t->cfg.button_key = code;
         else ok = false;
+    } else if (strncmp(line, "gate", 4) == 0 && line[4] >= '1' && line[4] <= '0' + PT_MAX_GATES && !line[5] && arg) {
+        uint8_t gate = (uint8_t)(line[4] - '1');
+        uint16_t lanes;
+        if (!parse_lanes(arg, &lanes) || (gate == 0 && strcmp(arg, "none") == 0)) {
+            ok = false;
+        } else {
+            /* lanes named move to this gate; with "none", this gate's lanes go back to gate 1 */
+            for (uint8_t lane = 0; lane < PT_MAX_LANES; lane++) {
+                if (lanes & lane_bit(lane)) t->cfg.lane_gate[lane] = gate;
+                else if (strcmp(arg, "none") == 0 && t->cfg.lane_gate[lane] == gate) t->cfg.lane_gate[lane] = 0;
+            }
+        }
     } else if (strcmp(line, "save") == 0) {
         t->save_requested = true;
         say_line(t, "saved");
@@ -339,8 +449,11 @@ void pt_receive(pt_timer *t, char c, const pt_inputs *in) {
     }
     if (t->pending == 'M') {
         t->pending = 0;
+        /* lanes 1 to 9 by their digit; 10 to 12 as A to C (or the characters after '9': ':', ';', '<') */
         int lane = c - '0';
-        if (lane >= 1 && lane <= t->cfg.num_lanes) t->mask |= (uint8_t)(1u << (lane - 1));
+        if (c >= 'A' && c <= 'C') lane = 10 + (c - 'A');
+        if (c >= 'a' && c <= 'c') lane = 10 + (c - 'a');
+        if (lane >= 1 && lane <= t->cfg.num_lanes) t->mask |= lane_bit((uint8_t)(lane - 1));
         say_char(t, MSG_ACK);
         return;
     }
@@ -372,8 +485,8 @@ void pt_receive(pt_timer *t, char c, const pt_inputs *in) {
         if (t->mode == PT_FINISH) send_results(t);
         else say_char(t, MSG_ACK);
         break;
-    case 'G': /* is the gate open? */
-        say_char(t, in && in->gate_open ? MSG_GATE_OPEN : MSG_ACK);
+    case 'G': /* is a gate open? */
+        say_char(t, any_gate_open(t, in) ? MSG_GATE_OPEN : MSG_ACK);
         break;
     case 'M': /* mask a lane: the lane number follows */
         t->pending = 'M';

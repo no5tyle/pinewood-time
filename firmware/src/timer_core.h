@@ -16,8 +16,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define PT_MAX_LANES 8
-#define PT_VERSION "1.1.0"
+#define PT_MAX_LANES 12
+/* Start gates: each lane is timed from the gate its track starts from (several tracks side by side) */
+#define PT_MAX_GATES 4
+#define PT_VERSION "1.2.0"
 /* The PDT protocol version this timer implements, reported for the V command */
 #define PT_PROTOCOL_VERSION "3.40"
 
@@ -30,12 +32,13 @@ typedef enum {
 } pt_mode;
 
 typedef struct {
-    uint8_t num_lanes;      /* lanes on the track, 1 to 8 */
+    uint8_t num_lanes;      /* lanes on the track, 1 to 12 */
     bool lane_trip_high;    /* a lane triggers when its input goes high (beam broken, this board's sensors) */
     bool gate_trip_high;    /* the race starts when the gate input goes high */
     uint8_t brightness;     /* lane displays, 0 to 15 */
     bool button_next;       /* the reset button asks the race software for the next heat (else it resets) */
     uint8_t button_key;     /* in that mode, the key it also types (a USB keyboard usage code; 0 = none) */
+    uint8_t lane_gate[PT_MAX_LANES]; /* the start gate each lane is timed from: 0 = gate 1 (the default) */
 } pt_config;
 
 /* Where the timer's replies go: text to the computer */
@@ -44,9 +47,10 @@ typedef void (*pt_write_fn)(const char *text, void *ctx);
 typedef struct {
     pt_config cfg;
     pt_mode mode;
-    uint8_t mask;            /* lanes left out of this race (bit 0 = lane 1) */
-    uint8_t finished;        /* lanes that have crossed the line */
-    uint64_t start_us;
+    uint16_t mask;           /* lanes left out of this race (bit 0 = lane 1) */
+    uint16_t finished;       /* lanes that have crossed the line */
+    uint8_t started;         /* gates that have opened in this race (bit 0 = gate 1) */
+    uint64_t start_us[PT_MAX_GATES]; /* when each gate opened */
     uint32_t lane_us[PT_MAX_LANES]; /* time from the start, in microseconds */
     uint8_t place[PT_MAX_LANES];    /* 1 = first; 0 = no finish */
     bool debug;
@@ -65,9 +69,12 @@ typedef struct {
 
 /* What the hardware tells the core about, when it asks */
 typedef struct {
-    bool gate_open;          /* the start gate is in its tripped (open) position */
-    uint8_t lane_raw;        /* each lane input's level, bit 0 = lane 1 (for the T command and test mode) */
+    uint8_t gates_open;      /* gates in their tripped (open) position, bit 0 = gate 1 */
+    uint16_t lane_raw;       /* each lane input's level, bit 0 = lane 1 (for the T command and test mode) */
 } pt_inputs;
+
+/* The gates in use with these settings: gate 1, and any other gate with a lane in use timed from it */
+uint8_t pt_gates_in_use(const pt_config *cfg);
 
 pt_config pt_default_config(void);
 /* Starts up: sends P (power on) and waits in PT_INIT for a reset */
@@ -76,8 +83,9 @@ void pt_init(pt_timer *t, const pt_config *cfg, pt_write_fn write, void *ctx);
 void pt_reset(pt_timer *t, const pt_inputs *in);
 /* One character from the computer */
 void pt_receive(pt_timer *t, char c, const pt_inputs *in);
-/* The start gate opened at this time */
-void pt_gate_tripped(pt_timer *t, uint64_t now_us);
+/* A start gate opened at this time (gate 0 = gate 1). The race starts with the first gate in use to open;
+ * each lane is timed from its own gate */
+void pt_gate_tripped(pt_timer *t, uint8_t gate, uint64_t now_us);
 /* A lane's beam broke at this time (lane 0 = lane 1). Only the first break in a race counts */
 void pt_lane_tripped(pt_timer *t, uint8_t lane, uint64_t now_us);
 /* Ends the race now (F, or the reset button while racing): lanes still out get no time */
@@ -102,7 +110,8 @@ const char *pt_key_name(uint8_t code, char *buf, int size);
 
 /* Enters sensor test mode (reset button held at power on) */
 void pt_enter_test(pt_timer *t);
-/* In test mode, a report of what the sensors see, e.g. "test lanes=1.0. gate=closed" */
+/* In test mode, a report of what the sensors see, e.g. "test lanes=1.0. gate=closed" (with more than one
+ * gate in use: "gates=closed,open") */
 void pt_test_report(pt_timer *t, const pt_inputs *in);
 
 /* "1 - 2.3456": a lane's result line, as the protocol sends it (no time is 99.9990) */

@@ -6,7 +6,8 @@ holds the board and a break-beam sensor for each lane.
 
 ![The finish gate on the track](hardware/gate/renders/gate-front.png)
 
-- **Up to 8 lanes**, timed to the microsecond from the start gate opening (results to 0.0001 s)
+- **Up to 8 lanes on this board** (the firmware handles 12), timed to the microsecond from the start gate opening (results to 0.0001 s)
+- **Tracks side by side** race as one: up to 4 start gates, each lane timed from its own track's gate ([how](docs/protocol.md#several-tracks-several-start-gates))
 - **PDT-compatible**: talks the protocol of the PDT timer over USB, so race software with a PDT option can drive it
 - Start gate and reset button inputs; in the gate, an MX keyboard switch is the button. It can instead call
   up the next heat in the race software (a serial message, and a key press on the timer's USB keyboard)

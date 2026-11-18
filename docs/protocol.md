@@ -17,8 +17,8 @@ Every message from the timer ends with `\r\n`.
 |---|---|
 | `P` | Powered on. It then waits for a reset (`R` or the reset button). |
 | `K` | Reset and ready: the next time the gate opens, a race starts. |
-| `O` | Asked to get ready, but the start gate is already open. Close it and reset again. |
-| `B` | The gate opened: the race has started. |
+| `O` | Asked to get ready, but a start gate is already open. Close it and reset again. |
+| `B` | The gate opened: the race has started. With [several start gates](#several-tracks-several-start-gates), the first one to open. |
 | `.` | A command was done. |
 | results | When every lane is in (or the race is ended early): one line per lane, lane 1 first. |
 | `#next` | The reset button was pressed in [next heat](#the-reset-button-next-heat) mode. Not part of the PDT protocol. |
@@ -43,8 +43,8 @@ Single characters, no line ending needed.
 | `R` | Reset: get ready for the next race (`K`, or `O` if the gate is open). During a race it ends the race and sends the results; send `R` again to get ready. |
 | `F` | End the race now and send the results (lanes not in get `99.9990`). |
 | `Q` | Send the last results again. |
-| `G` | Is the gate open? `O` if so, `.` if not. |
-| `M` then a lane digit | Leave that lane out of the next races (`M3`). |
+| `G` | Is a gate open? `O` if so, `.` if not. |
+| `M` then a lane digit | Leave that lane out of the next races (`M3`). Lanes 10 to 12 are `A`, `B` and `C` (or `:`, `;` and `<`, the characters after `9`). |
 | `U` | Put every lane back in. |
 | `N` | Number of lanes: `numl=4`. |
 | `V` | Protocol version: `vert=3.40`. |
@@ -60,12 +60,13 @@ across power cycles (in the Pico's flash).
 
 | Send | Does |
 |---|---|
-| `#lanes 6` | Lanes in use, 1 to 8 (default 4). |
+| `#lanes 6` | Lanes in use, 1 to 12 (default 4). The board has sockets for 8. |
 | `#lane-trip high` / `low` | Whether a lane input goes high (default, for break-beam receivers) or low when a car crosses. |
 | `#gate-trip high` / `low` | Whether the gate input goes high (default: a switch held closed by the shut gate, which opens as the gate drops) or low when the gate opens. |
 | `#brightness 6` | Lane display brightness, 0 to 15. |
 | `#button reset` / `next` | What the reset button does when there's no race running (default `reset`); see below. |
 | `#button-key enter` | The key the button types in `next` mode (default `enter`; `none` for no key). |
+| `#gate2 4-6` | Lanes 4 to 6 are timed from start gate 2. Likewise `#gate3` and `#gate4`; see below. |
 | `#save` | Save the settings. Replies `saved`. |
 | `#info` | The same as `I`. |
 
@@ -93,8 +94,41 @@ open, `next` falls back to a reset, so the button still does something useful on
 #save
 ```
 
+## Several tracks, several start gates
+
+Tracks side by side can race together as one heat: two 3-lane tracks as 6 lanes, up to four as 12. Each
+track has its own start gate, and each lane is timed from its own track's gate, so a gate that drops a
+moment late doesn't cost its cars anything.
+
+Every lane starts on gate 1. Move lanes to gates 2 to 4 with:
+
+```
+#lanes 12
+#gate2 4-6
+#gate3 7-9
+#gate4 10-12
+#save
+```
+
+Lanes are a range (`4-6`), a list (`4,5,6`) or both (`1-2,5`). Lanes named move to that gate from
+wherever they were. `#gate2 none` moves gate 2's lanes back to gate 1. `#info` lists each gate's lanes.
+
+- **With one start gate** (no `#gate` settings, as on any timer that's never had them), nothing changes.
+  Gates 2 to 4 aren't used, and their pins stay free for other things.
+- **Getting ready:** the timer gets ready (`K`) only when every gate in use is shut, and replies `O`
+  otherwise. An unplugged gate reads as open, so a gate set up but not connected stops the timer getting
+  ready rather than starting its lanes at once.
+- **The race** starts (`B`) when the first gate opens. Each lane is timed from its own gate. A beam broken
+  before its gate has opened doesn't count.
+- **The results** come as usual, one line per lane, with places across all the lanes.
+- **A heat on fewer tracks:** mask the lanes not racing (`M`). Their gate still has to be shut to get ready,
+  but the race doesn't wait for its lanes.
+
+Gates 2 to 4 connect to the AUX header: see [wiring](wiring.md#start-gates-2-to-4-aux).
+
 ## Test mode
 
 Hold the reset button while plugging in. The status light goes white, the timer sends
 `test lanes=.1.. gate=closed` four times a second (`1` = that lane's beam is broken), and each lane display
-shows `8888` while its beam is broken. Press reset to leave.
+shows `8888` while its beam is broken. With more than one gate in use it reports each one:
+`gates=1:closed,2:open`. Press reset to leave.

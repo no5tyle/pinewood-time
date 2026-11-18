@@ -96,5 +96,42 @@ place, `P1`, `P2`... in turn.
 
 ## AUX header
 
-GND, 3V3, 5V, GP26, GP27, GP28: spare, for a buzzer or a start-gate solenoid driver later. The firmware
-doesn't use them yet. Don't drive a solenoid straight from a pin; it needs a transistor or MOSFET and a diode.
+GND, 3V3, 5V, GP26, GP27, GP28 (pins 1 to 6). GP26 to GP28 are start gates 2 to 4 when tracks race side by
+side (below); otherwise they're spare, for a buzzer or a start-gate solenoid driver later. Don't drive a
+solenoid straight from a pin; it needs a transistor or MOSFET and a diode.
+
+The [finish gate](../hardware/gate)'s emitter lead uses pins 1 and 3 (GND and 5V).
+
+## Start gates 2 to 4 (AUX)
+
+For tracks side by side, each with its own start gate ([how it works](protocol.md#several-tracks-several-start-gates)):
+
+| Gate | Pico pin | AUX pin |
+|---|---|---|
+| 1 | GP18 | the GATE socket |
+| 2 | GP26 | 4 |
+| 3 | GP27 | 5 |
+| 4 | GP28 | 6 |
+
+Use the same kind of switch as gate 1: closed while the gate is up, between the signal and GND.
+
+The GATE socket has a 10k pull-up and a 1k series resistor on the board; the AUX pins have neither, only the
+Pico's own weak pull-up. A start gate is at the far end of a long cable, so give each extra gate the same two
+resistors, on a small piece of stripboard where the lead plugs into the AUX header:
+
+```
+AUX pin 2 (3V3) --- 10k ---+--- to the gate switch --- switch --- GND
+                           |
+AUX pin 4 (GP26) --- 1k ---+
+```
+
+One 6-way housing on the AUX header, into the stripboard, can carry all of it: GND and 5V on to the
+emitter lead, 3V3 to the pull-ups, and GP26 to GP28 through their 1k resistors to a 2-way socket per gate
+(signal and GND).
+
+### Lanes 9 to 12
+
+The firmware times up to 12 lanes, on GP0 to GP11, but this board has sockets for lanes 1 to 8 (GP0 to
+GP7). Four 3-lane tracks (12 lanes) need a board with four more lane sockets and resistor sets on GP8 to
+GP11. With this board, two or three gates work for up to 8 lanes: two 3-lane tracks (6 lanes), or two
+4-lane tracks.
