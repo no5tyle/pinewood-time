@@ -9,7 +9,8 @@ bar holds the three emitters in the rails and dovetails into the legs.
 ![The gate on the track](renders/gate-front.png)
 
 Everything is in [`finish-gate.scad`](finish-gate.scad) (OpenSCAD), with the track's dimensions at the top
-so it can be adjusted for another track. `./build.sh` re-exports the STLs and pictures.
+so it can be adjusted for another track. The jigs for drilling the track are in [`drill-jig.scad`](drill-jig.scad),
+with the same dimensions. `./build.sh` re-exports the STLs and pictures.
 
 ## What it fits
 
@@ -43,6 +44,9 @@ padded board across the end).
 | `stl/mx_blank.stl` | 1 | fills the switch socket if you don't fit a key |
 | `stl/led_lens.stl` | 1 | print in white or clear; pushes into the status light window |
 | `stl/sensor_bar.stl` | 1 | under the track: the three emitters, and a dovetail into each leg. 307 × 30 mm: lay it diagonally on a 256 × 256 mm bed |
+| `stl/drill_jig_left.stl` | 1 | drilling jig for lanes 1 and 2 (167 × 217 mm on the bed). Only needed once, to drill the track |
+| `stl/drill_jig_right.stl` | 1 | drilling jig for lane 3 (69 × 217 mm) |
+| `stl/drill_bush.stl` | 1 | the pilot bush that drops into the jigs' guides |
 
 All of it prints without supports at 0.2 mm in PLA or PETG, 3 walls, 20% infill. The halves lie on their
 backs with the chequers up. For two colours, change filament for the last 0.8 mm of each half, where
@@ -100,14 +104,44 @@ at the top, so the bar stops just under the board. An M3 pin through the leg and
 
 ### Modifying the track
 
-On Track E, for each lane:
+Each lane needs a 10 mm hole through the rail and board at the finish line, 200 mm from the tail end. The
+sensor bar's turrets are 9.6 mm across, so the holes have to be within about 0.2 mm of where the bar
+expects them. Two printed jigs ([`drill-jig.scad`](drill-jig.scad)) put them there.
 
-1. Mark the finish line square across the board, 200 mm from the tail end.
-2. Where it crosses each rail centre line (50, 148, 246 mm from the left edge), drill a 10 mm hole
-   through the rail and board. Drill a pilot right through first, then the 10 mm bit a few millimetres in
-   from the underside, then finish from the top, so neither face splinters.
-3. The sensor bar's turrets go up into these holes when the gate is fitted (below). Nothing is screwed to
-   the track, so the gate and bar lift off for packing.
+![The drilling jigs on the track](renders/drill-jig.png)
+
+Each jig is an L. Its long side is a fence that runs down the board's side edge, with a lip at the end
+that hooks over the tail end. Its short side crosses the track, sitting on the rail tops, with a 16 mm
+tall drill guide over each rail. The fence sets how far across the track each hole is, from the same board
+edges the gate's legs stand against. The lip sets the finish line at 200 mm. The fence also keeps the
+holes square to the track.
+
+- **`drill_jig_left`** goes against the left edge and drills lanes 1 and 2 (50 and 148 mm in).
+- **`drill_jig_right`** goes against the right edge and drills lane 3 (50 mm in from that side).
+- **`drill_bush`** drops into either guide to steer a 3 mm pilot drill through the middle.
+
+Both jigs print upside down on their flat top, with no supports. Check the bush slides into a guide and
+a 10 mm bit turns freely in one before using them. Printers vary, so open the guide with a 10 mm drill
+by hand if it's tight.
+
+On Track E:
+
+1. Check the tail end is square to the board edges. The lip measures from it, so a crooked end puts
+   the lanes at different distances.
+2. Set the left jig on the track, the fence against the left edge and the lip against the tail end, and
+   clamp it there through the arm.
+3. For each of its guides: drop the bush in and drill a 3 mm pilot right through the rail and board.
+   Lift the bush out.
+4. Do the same with the right jig against the right edge, for lane 3.
+5. Lift the jigs off. From underneath, drill 10 mm a few millimetres in at each pilot, so the
+   underside doesn't splinter.
+6. Clamp the jigs back on and finish each hole from the top with the 10 mm bit through the guide. A
+   brad-point bit follows the pilot best.
+7. Try the sensor bar in the holes before fitting the gate. If a turret binds, ease that hole with a
+   round file rather than forcing it.
+
+The sensor bar's turrets go up into these holes when the gate is fitted (below). Nothing is screwed to
+the track, so the gate and bar lift off for packing.
 
 That leaves 15 mm of rail either side of the hole, so the rail still guides the wheels. The turrets stop
 1 mm below the rail top, out of reach of the cars.
