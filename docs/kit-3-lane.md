@@ -26,13 +26,26 @@ Prices are rough, in Australian dollars with GST, from late 2026. Check the list
 | 1 | Lever microswitch | start gate |
 | 1 | [Adafruit panel-mount USB-C to Micro-B cable, 30 cm (ADA4056)](https://core-electronics.com.au/panel-mount-cable-usb-c-to-micro-b-male-30cm.html) | USB-C socket on the finish gate's right leg |
 | 1 | USB-C data cable (not a charge-only one) | gate to the race computer |
-| ~6 m | 4-core cable (alarm or phone cable is fine) | about 1.5 m a lane, and the gate |
+| ~5 m | 4-core cable (alarm or phone cable is fine) | about 1.5 m a lane |
+
+**For the sockets on the back of the finish gate's legs** (SENSORS and START; see
+[the gate](../hardware/gate/README.md#the-sockets-on-the-back-of-the-legs)). These aren't at Core
+Electronics; Jaycar or Altronics have them, or AliExpress for less:
+
+| Qty | Item | For | About |
+|---|---|---|---|
+| 1 | GX12 2-pin panel socket and plug ("GX12 aviation connector, 2 pin") | SENSORS: the sensor bar's lead | A$3-5 |
+| 1 | RJ11 keystone jack, 6P4C | START, in the left leg | A$4-6 |
+| 1 | RJ11 phone wall socket (surface mount) | at the start gate, wired to the microswitch | A$5 |
+| 1 | RJ11 phone extension cable, 10 m (15 m if the track's longer) | start gate to finish gate | A$8-12 |
+| 4 | M3 × 10 countersunk self-tapping screws | the two faceplates | |
 
 Optional: a panel-mount push button on 2-core cable, for a button at the finish line. It resets the
 timer, or with `#button next` calls up the next heat in the race software
 ([details](protocol.md#the-reset-button-next-heat)).
 
-About A$60 plus the boards. The resistor and connector kits have plenty left over for more boards.
+About A$85 plus the boards and the gate's printing and fasteners. The resistor and connector kits have
+plenty left over for more boards.
 
 Notes on the kits:
 
@@ -72,9 +85,15 @@ Pin 1 stays empty. Mount each pair just past the finish line, either facing acro
 emitter on a bridge above pointing down at the receiver set into the track. The overhead layout stops one
 lane's beam reaching the next lane's receiver.
 
-**Gate:** wire the microswitch's common and normally-closed (NC) terminals to the gate plug, so the switch is
-closed while the gate is up and opens as it drops. If it works the other way round, send `#gate-trip low`
-then `#save`.
+**Start gate:** wire the microswitch's common and normally-closed (NC) terminals to the middle pair of the
+RJ11 phone socket at the start (the two middle screws), so the switch is closed while the gate is up and
+opens as it drops. The phone extension cable joins it to the **START** socket on the finish gate. If it works
+the other way round, send `#gate-trip low` then `#save`.
+
+**Inside the finish gate**, once: START's RJ11 jack (middle pair, pins 3 and 4) to a 2-pin plug for the gate
+socket (J9), and the SENSORS socket (GX12 pin 1 5V, pin 2 GND) to the AUX header (J12): GND on pin 1, 5V on
+pin 3. The sensor bar's lead gets the GX12 plug: pin 1 red, pin 2 black. See
+[the gate](../hardware/gate/README.md#the-sockets-on-the-back-of-the-legs).
 
 ## Setting up
 
@@ -84,6 +103,20 @@ then `#save`.
 3. Hold the reset button while plugging in for test mode. Block each beam in turn and check the right
    lane shows `1`.
 4. In the race software, choose the PDT timer and 3 lanes.
+
+## Linking more tracks
+
+Each extra track gets its own finish gate with the same parts as above, and the gates link with network patch
+cables ([how](wiring.md#linking-gates)). Per gate, add:
+
+| Qty | Item | For | About |
+|---|---|---|---|
+| 1 | 1N5817 Schottky diode | D2: power down the link | A$0.50 |
+| 2 | RJ45 keystone jacks, Cat5e or Cat6, unshielded | LINK IN and LINK OUT | A$4-6 each |
+| 1 | Network patch cable, 1-2 m | to the next gate (one fewer than the gates) | A$5 |
+| 1 | Network patch cable, about 1 m, to cut up | the two leads inside the gate | |
+
+From the kits: two more 4-pin JST sockets (J13, J14), and R41-R46 (four 1k, two 10k).
 
 ## Adding lane displays
 
