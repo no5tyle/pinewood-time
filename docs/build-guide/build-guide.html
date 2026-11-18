@@ -347,21 +347,21 @@
   <h2>12. Linking gates: tracks side by side</h2>
   <p>Build a gate for each track, all the same, and link up to three into one timer (up to 12 lanes). On race day
   they join with ordinary network patch cables.</p>
-  <figure><img src="../../hardware/gate/renders/link-sockets.png" style="width:70%"><figcaption>The link sockets: RJ45 keystone jacks in brackets on the back of the legs. LINK IN on the left leg, LINK OUT on the right.</figcaption></figure>
+  <figure><img src="../../hardware/gate/renders/link-sockets.png" style="width:70%"><figcaption>A link socket: an RJ45 keystone jack built into the back of the leg, behind a flush faceplate. LINK IN on the left leg, LINK OUT on the right.</figcaption></figure>
   <h3>Extra parts, per gate</h3>
   <table>
     <tr><th>Qty</th><th>Part</th><th>For</th></tr>
     <tr><td class="n">1</td><td>1N5817 Schottky diode (D2), 4 &times; 1k and 2 &times; 10k resistors (R41&ndash;R46), 2 more 4-pin JST XH sockets (J13, J14)</td><td>the links on the board</td></tr>
     <tr><td class="n">2</td><td>RJ45 keystone jacks, Cat5e or Cat6, unshielded (tool-less ones need no punch-down tool)</td><td>the link sockets</td></tr>
     <tr><td class="n">1</td><td>Network patch cable, about 1 m (to cut up for the leads)</td><td>two leads, about 40 cm each</td></tr>
-    <tr><td class="n">4</td><td>M3 &times; 12 self-tapping screws</td><td>the brackets</td></tr>
+    <tr><td class="n">4</td><td>M3 &times; 10 countersunk self-tapping screws</td><td>the faceplates</td></tr>
   </table>
-  <p>And print <code>link_in.stl</code> and <code>link_out.stl</code>, standing on their tabs.</p>
+  <p>And print <code>link_in.stl</code> and <code>link_out.stl</code> (the faceplates), face down.</p>
   <h3>Building</h3>
   <ol>
     <li>On the board, fit J13, J14, R41&ndash;R46 and D2 (its stripe towards the board's 5V, as marked).</li>
     <li>Make two leads from the patch cable. At one end, punch the wires onto the keystone jack by its T568B colour labels. At the other, crimp four into a 4-pin JST XH plug: <b>1</b> blue (jack pin 4, 5V), <b>2</b> white-brown (pin 7, GND), <b>3</b> white-orange (pin 1), <b>4</b> white-green (pin 3). Cut the other four wires back.</li>
-    <li>Snap each jack into its bracket from the open side. Feed its lead through the hole in the back of the leg, up the leg's channel and along the beam: LINK IN's to J13, LINK OUT's to J14. Screw each bracket to its leg with two M3 &times; 12.</li>
+    <li>Snap each jack into its faceplate from behind. Feed its lead into the pocket in the back of the leg, up the leg's channel and along the beam: LINK IN's to J13, LINK OUT's to J14. Push the jack into the pocket until the faceplate sits flush, and screw it in with two M3 &times; 10 countersunk.</li>
     <li>On each gate, over USB on its own: send <code>#lanes 3</code> and <code>#save</code>.</li>
   </ol>
   <h3>Racing</h3>

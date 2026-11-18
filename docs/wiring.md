@@ -163,7 +163,7 @@ from its own start gate. Unlinked, each one is a timer on its own.
 
 ### The RJ45 link sockets
 
-Each bracket's jack joins the board's link socket by a short lead (about 40 cm: up the leg's channel and
+Each jack joins the board's link socket by a short lead (about 40 cm: up the leg's channel and
 along the beam). Four wires, the same for LINK IN and LINK OUT; the jack's other pins stay empty:
 
 | Board link socket (JST XH) | RJ45 jack pin | T568B colour |

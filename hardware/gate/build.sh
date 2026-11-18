@@ -26,4 +26,4 @@ eval $RUN openscad -o renders/gate-exploded.png -D "'part=\"exploded\"'" --imgsi
 eval $RUN openscad -o renders/drill-jig.png --imgsize=1600,1000 --colorscheme=Tomorrow \
   --camera=150,70,0,50,0,20,640 --projection=p drill-jig.scad
 eval $RUN openscad -o renders/link-sockets.png -D "'part=\"links\"'" --imgsize=1600,1000 --colorscheme=Tomorrow \
-  --camera=148,60,60,62,0,150,700 --projection=p finish-gate.scad
+  --camera=-12,20,30,70,0,200,230 --projection=p finish-gate.scad

@@ -43,7 +43,7 @@ padded board across the end).
 | `stl/cover.stl` | 1 | the top cover over the board (204 × 40 mm); prints upside down. MX switch socket and status light window |
 | `stl/mx_blank.stl` | 1 | fills the switch socket if you don't fit a key |
 | `stl/led_lens.stl` | 1 | print in white or clear; pushes into the status light window |
-| `stl/link_in.stl`, `stl/link_out.stl` | 1 each | only to [link gates](#linking-gates): the brackets for the RJ45 link sockets, on the back of the legs. Print standing on the tabs |
+| `stl/link_in.stl`, `stl/link_out.stl` | 1 each | only to [link gates](#linking-gates): the faceplates for the RJ45 link sockets, set into the back of the legs. Print face down |
 | `stl/sensor_bar.stl` | 1 | under the track: the three emitters, and a dovetail into each leg. 307 × 30 mm: lay it diagonally on a 256 × 256 mm bed |
 | `stl/drill_jig_left.stl` | 1 | drilling jig for lanes 1 and 2 (167 × 217 mm on the bed). Only needed once, to drill the track |
 | `stl/drill_jig_right.stl` | 1 | drilling jig for lane 3 (69 × 217 mm) |
@@ -66,7 +66,7 @@ the chequers and FINISH start (at 40.0 mm).
 | 1 | MX switch (any) and a 1u keycap | optional: the button |
 | 1 | Adafruit panel-mount USB-C to Micro-B cable (ADA4056), with its two M3 screws | optional: USB-C on the right leg |
 | 2 | RJ45 keystone jacks, Cat5e or Cat6, unshielded (punch-down or tool-less) | optional: the link sockets |
-| 4 | M3 × 12 self-tapping screws | the link brackets, into the backs of the legs |
+| 4 | M3 × 10 countersunk self-tapping screws | the link faceplates |
 
 ## Sensors: will they fit?
 
@@ -184,18 +184,20 @@ cables, from one gate's **LINK OUT** to the next gate's **LINK IN**.
 
 ![The link sockets on the back of the legs](renders/link-sockets.png)
 
-Each link socket is a standard RJ45 keystone jack (the snap-in kind for wall plates) in a printed bracket
-that screws to the back of a leg: **LINK IN** on the left leg, **LINK OUT** on the right. Put the main gate
+Each link socket is a standard RJ45 keystone jack (the snap-in kind for wall plates), built into the back
+of a leg behind a small faceplate that sits flush with it: **LINK IN** on the left leg, **LINK OUT** on the
+right. The jack's body sits in a pocket inside the leg, which opens into the leg's cable channel. Put the main gate
 (the one plugged into the computer) on the left-hand track, so the links run left to right. The main gate's
 USB powers the gates after it, so they don't need a USB lead.
 
-**Fitting a bracket:** snap the jack into the bracket from the open side, its front out through the opening
-and its latch clicking over the edge. Feed the lead (below) through the hole in the back of the leg into its
-cable channel, up the leg and along the beam to the board's link socket (LINK IN to J13, LINK OUT to J14).
-Then screw the bracket to the leg with two M3 × 12 self-tapping screws, into the pilot holes above and below
-the hole.
+**Fitting a socket:** snap the jack into the faceplate from behind, its front out through the opening and
+its latch clicking over the edge. Feed the lead (below) into the pocket in the back of the leg, up the cable
+channel and along the beam to the board's link socket (LINK IN to J13, LINK OUT to J14). Push the jack into
+the pocket until the faceplate sits flush in its recess, and screw it in with two M3 × 10 countersunk
+self-tapping screws. Keystone jacks vary a little: if one is too long for the pocket (more than 33 mm
+behind its front), use a shorter one.
 
-Each bracket's jack joins the board's link socket by a short lead (about 40 cm: up the leg's channel and
+Each jack joins the board's link socket by a short lead (about 40 cm: up the leg's channel and
 along the beam). Four wires, the same for LINK IN and LINK OUT; the jack's other pins stay empty:
 
 | Board link socket (JST XH) | RJ45 jack pin | T568B colour |
