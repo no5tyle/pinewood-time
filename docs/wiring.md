@@ -6,7 +6,7 @@ Every input on the board is pulled up to 3.3 V and reaches the Pico through a 1k
 **connects the signal to GND** works: a switch, an open-collector break-beam receiver, a phototransistor.
 Nothing on the track ever sees more than 5 V, and the Pico never sees more than 3.3 V.
 
-## Lane sensors (LANE 1 to 8)
+## Lane sensors (LANE 1 to 4)
 
 Each lane socket is a 4-pin JST XH (2.5 mm pitch):
 
@@ -129,9 +129,34 @@ One 6-way housing on the AUX header, into the stripboard, can carry all of it: G
 emitter lead, 3V3 to the pull-ups, and GP26 to GP28 through their 1k resistors to a 2-way socket per gate
 (signal and GND).
 
-### Lanes 9 to 12
+These are for one board timing two tracks, with a start gate each. For tracks that each have their own
+finish gate, [link the gates](#linking-gates) instead.
 
-The firmware times up to 12 lanes, on GP0 to GP11, but this board has sockets for lanes 1 to 8 (GP0 to
-GP7). Four 3-lane tracks (12 lanes) need a board with four more lane sockets and resistor sets on GP8 to
-GP11. With this board, two or three gates work for up to 8 lanes: two 3-lane tracks (6 lanes), or two
-4-lane tracks.
+## Linking gates
+
+Tracks side by side, each with its own finish gate, race as one heat when the gates are linked: up to three
+gates (12 lanes). Every gate is the same: the same board, firmware and print, each timing its own track
+from its own start gate. Unlinked, each one is a timer on its own.
+
+```
+ computer --USB-- [ gate 1 ] LINK OUT ---- LINK IN [ gate 2 ] LINK OUT ---- LINK IN [ gate 3 ]
+                  lanes 1-3                         lanes 4-6                          lanes 7-9
+```
+
+- **Cables:** a straight 4-core cable from one gate's LINK OUT to the next gate's LINK IN, a 4-pin JST XH
+  plug at each end, pin 1 to pin 1 and so on. The board crosses the data over, so no special cable is
+  needed. 1 to 2 m is plenty between tracks side by side; keep it under about 5 m.
+- **The main gate** is the one with nothing on its LINK IN: plug the computer into it. The others don't need
+  USB. The main gate powers them down the link (about 0.1 A a gate with three lanes of break-beam sensors).
+- **Lane numbers follow the cables.** The gate on the main gate's LINK OUT has the next lanes, and so on.
+  Set each gate's own lanes (`#lanes 3`, `#save`) once, on its own, over USB.
+- **Each gate needs its own start gate** switch, on its own GATE socket.
+
+| LINK pin | LINK IN | LINK OUT |
+|---|---|---|
+| 1 | 5V in (through D2) | 5V out |
+| 2 | GND | GND |
+| 3 | data in (GP13) | data out (GP8) |
+| 4 | data out (GP12) | data in (GP9) |
+
+How the main gate and the race software see it is in [the protocol](protocol.md#linked-gates).

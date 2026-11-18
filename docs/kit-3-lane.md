@@ -45,15 +45,15 @@ Notes on the kits:
 
 | Fit | Leave empty |
 |---|---|
-| U1 (Pico) | J4-J8 (lanes 4-8) |
-| J1, J2, J3 (lane sockets) | R1-R8 |
-| R11, R12, R13 (10k) | R14-R18, R24-R28 |
+| U1 (Pico) | J4 (lane 4) |
+| J1, J2, J3 (lane sockets) | R1-R4 |
+| R11, R12, R13 (10k) | R14, R24 |
 | R21, R22, R23 (1k) | J11, R35, R36 (displays) |
 | J9, R31 (10k), R32 (1k): gate | |
 | J10, R33 (10k), R34 (1k): reset | |
 | J12: 5V and GND for the finish gate's emitters | |
 | D1, R37, R38, R39 (220 Ω): status light | |
-| C1, C2 | |
+| C1, C2 | J13, J14, D2, R41-R46 (links: fit these to [join gates](wiring.md#linking-gates)) |
 
 The empty places do no harm and can be filled later for more lanes. Solder the lowest parts first, and see
 the [README](../README.md#3-solder-it) for which way round the parts go.

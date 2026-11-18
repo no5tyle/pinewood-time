@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 """
 Generates the pinewood-time PCB (KiCad 7): a carrier board for a Raspberry Pi Pico that turns it into a
-pinewood derby race timer for up to 8 lanes.
+pinewood derby race timer for up to 4 lanes, with links to two more boards (in the other tracks' finish
+gates) for up to 12 lanes in one heat.
 
     /usr/bin/python3 hardware/generate_board.py place   # places the parts and writes the board
     /usr/bin/python3 hardware/route.py                  # routes every net but GND as tracks
@@ -25,13 +26,13 @@ BOARD = os.path.join(HERE, "pinewood-time.kicad_pcb")
 PROJECT = os.path.join(HERE, "pinewood-time.kicad_pro")
 FP = "/usr/share/kicad/footprints"
 
-VERSION = "v1.1"
+VERSION = "v1.2"
 # Board size, mm. Everything is placed from its top-left corner. Long and narrow, to fit inside the finish
 # gate's beam (hardware/gate): 178 x 28 mm
 W, H = 178.0, 28.0
 ORIGIN = (100.0, 60.0)  # where the board sits on KiCad's page
 
-LANES = 8
+LANES = 4
 
 
 def mm(x, y):
@@ -46,8 +47,8 @@ def mm(x, y):
 
 # The Pico's pins (top view, USB at the top): 1-20 down the left, 21-40 up the right
 PICO_PINS = {
-    1: "LANE1", 2: "LANE2", 3: "GND", 4: "LANE3", 5: "LANE4", 6: "LANE5", 7: "LANE6", 8: "GND",
-    9: "LANE7", 10: "LANE8", 13: "GND", 18: "GND",
+    1: "LANE1", 2: "LANE2", 3: "GND", 4: "LANE3", 5: "LANE4", 8: "GND",
+    11: "OUT_TX", 12: "OUT_RX", 13: "GND", 16: "IN_TX", 17: "IN_RX", 18: "GND",
     21: "SDA", 22: "SCL", 23: "GND", 24: "GATE_IN", 25: "RESET_IN", 26: "LED_R_IN", 27: "LED_G_IN",
     28: "GND", 29: "LED_B_IN", 31: "AUX1", 32: "AUX2", 33: "GND", 34: "AUX3", 36: "+3V3", 38: "GND",
     39: "VSYS", 40: "VBUS",
@@ -85,6 +86,30 @@ for i in range(LANES):
          nets={1: "+3V3", 2: f"SENSE{n}"}, desc="Sensor pull-up to 3.3 V, 1/4 W")
     part(f"R{20 + n}", "Resistor_THT", R_VERT, "1k", cx + 3.3, R_Y, rot=-90,
          nets={1: f"SENSE{n}", 2: f"LANE{n}"}, desc="Series protection for the Pico input, 1/4 W")
+
+# Links to the other gates, where lanes 5 to 8 were: a socket each, laid out like a lane. LINK IN (towards
+# the main gate, UART0 on GP12/GP13) and LINK OUT (towards the next gate, UART1 on GP8/GP9). Pins 1 5V,
+# 2 GND, 3 and 4 the data, crossed between the two so a straight cable joins OUT to IN: OUT's pin 3 sends
+# and IN's pin 3 receives. The main gate's USB powers the chain: 5V goes out of LINK OUT, and comes in at
+# LINK IN through a Schottky diode, so a board plugged into USB itself never feeds the board before it.
+LINK_COLS = [("J13", "LINK IN", 4, {1: "LINK_5V", 2: "GND", 3: "IN_RX_C", 4: "IN_TX_C"},
+              [("R41", "1k", {1: "IN_TX", 2: "IN_TX_C"}, "Link in: series protection, data out, 1/4 W"),
+               ("R42", "10k", {1: "+3V3", 2: "IN_RX_C"}, "Link in: pull-up, data in (idle when unplugged), 1/4 W"),
+               ("R43", "1k", {1: "IN_RX_C", 2: "IN_RX"}, "Link in: series protection, data in, 1/4 W")]),
+             ("J14", "LINK OUT", 5, {1: "VBUS", 2: "GND", 3: "OUT_TX_C", 4: "OUT_RX_C"},
+              [("R44", "1k", {1: "OUT_TX", 2: "OUT_TX_C"}, "Link out: series protection, data out, 1/4 W"),
+               ("R45", "10k", {1: "+3V3", 2: "OUT_RX_C"}, "Link out: pull-up, data in (idle when unplugged), 1/4 W"),
+               ("R46", "1k", {1: "OUT_RX_C", 2: "OUT_RX"}, "Link out: series protection, data in, 1/4 W")])]
+for ref, label, col, nets, rs in LINK_COLS:
+    cx = LANE_X0 + col * LANE_PITCH
+    part(ref, "Connector_JST", "JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical", label, cx, J_Y, rot=-90, nets=nets,
+         desc=f"{label.title()} socket (to the {'main' if ref == 'J13' else 'next'} gate), JST XH 4-pin, 2.5 mm",
+         mpn="JST B4B-XH-A", lcsc="C144395")
+    for (rref, value, rnets, desc), dx in zip(rs, (-3.3, 0.0, 3.3)):
+        part(rref, "Resistor_THT", R_VERT, value, cx + dx, R_Y, rot=-90, nets=rnets, desc=desc)
+part("D2", "Diode_THT", "D_DO-41_SOD81_P2.54mm_Vertical_AnodeUp", "1N5817", LANE_X0 + 6 * LANE_PITCH, J_Y + 1.0,
+     rot=-90, nets={1: "VBUS", 2: "LINK_5V"},
+     desc="Power in from the link: Schottky 1N5817, 1 A (stripe = cathode, to 5V)", mpn="1N5817", lcsc="C2480")
 
 # Between the lanes and the Pico: start gate, reset, displays, spare pins, status light, supply caps
 part("J9", "Connector_JST", "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical", "GATE", 96.5, J_Y, rot=-90,
@@ -357,6 +382,11 @@ def labels(board):
         text(board, f"{i + 1}", LANE_X0 + i * LANE_PITCH + 4.7, J_Y, 1.2, bold=True)
     for k, name in enumerate(["LED+", "SIG", "GND", "5V"]):
         text(board, name, LANE_X0 - 4.2, J_Y + k * 2.5, 0.8, justify_right=True)
+    # The links: what each is, and its pins
+    for ref, label, col, nets, rs in LINK_COLS:
+        cx = LANE_X0 + col * LANE_PITCH
+        text(board, label, cx, J_Y + 11.8, 0.8, bold=True)
+    text(board, "1N5817", LANE_X0 + 6 * LANE_PITCH, J_Y + 8.4, 0.8)
     text(board, "GATE", 96.0, 20.2, 0.8)
     text(board, "RESET", 103.6, 20.2, 0.8)
     for k, name in enumerate(["GND", "3V3", "SCL", "SDA"]):

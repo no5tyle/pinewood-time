@@ -6,8 +6,8 @@ holds the board and a break-beam sensor for each lane.
 
 ![The finish gate on the track](hardware/gate/renders/gate-front.png)
 
-- **Up to 8 lanes on this board** (the firmware handles 12), timed to the microsecond from the start gate opening (results to 0.0001 s)
-- **Tracks side by side** race as one: up to 4 start gates, each lane timed from its own track's gate ([how](docs/protocol.md#several-tracks-several-start-gates))
+- **Up to 4 lanes a gate**, timed to the microsecond from the start gate opening (results to 0.0001 s)
+- **Tracks side by side race as one heat:** link up to three finish gates (up to 12 lanes). Every gate is the same and works on its own too; linked, each times its own track from its own start gate and the first one reports the whole heat ([how](docs/wiring.md#linking-gates))
 - **PDT-compatible**: talks the protocol of the PDT timer over USB, so race software with a PDT option can drive it
 - Start gate and reset button inputs; in the gate, an MX keyboard switch is the button. It can instead call
   up the next heat in the race software (a serial message, and a key press on the timer's USB keyboard)
@@ -40,9 +40,11 @@ holds the board and a break-beam sensor for each lane.
 
 ![The board, 178 × 28 mm](hardware/renders/pcb-front.png)
 
-Long and narrow (178 × 28 mm) so it fits inside the gate's beam. Lanes 1 to 8 run along the left, each a
-socket with three upright resistors above it; then the start gate, reset, display and spare-pin connectors,
-the status light, and the Pico at the right-hand end with its USB socket just past the end of the board.
+Long and narrow (178 × 28 mm) so it fits inside the gate's beam. Lanes 1 to 4 run along the left, each a
+socket with three upright resistors above it; then LINK IN and LINK OUT, for joining gates, and the link's
+power diode; then the start gate, reset, display and spare-pin connectors, the status light, and the Pico at
+the right-hand end with its USB socket just past the end of the board. (Board v1.1 had eight lane sockets
+and no links; the firmware still runs it.)
 
 ![The circuit](docs/schematic.svg)
 
@@ -67,16 +69,18 @@ The board is long and narrow so it fits inside the [finish gate](hardware/gate)'
 See [the parts list](hardware/fab/bom.md). In short, per board:
 
 - a Raspberry Pi Pico (or Pico 2), and 2 × 20-pin 2.54 mm male headers if yours hasn't got them
-- 1/4 W resistors: 8 × 180 Ω, 10 × 10k, 10 × 1k, 2 × 4.7k, 3 × 220 Ω
+- 1/4 W resistors: 4 × 180 Ω, 8 × 10k, 10 × 1k, 2 × 4.7k, 3 × 220 Ω
 - capacitors: 100 µF 10 V electrolytic (6.3 mm, 2.5 mm pitch), 100 nF ceramic (5 mm pitch)
-- JST XH sockets: 8 × 4-pin (B4B-XH-A), 2 × 2-pin (B2B-XH-A), and matching plugs and crimps for your cables
+- JST XH sockets: 6 × 4-pin (B4B-XH-A: 4 lanes and 2 links), 2 × 2-pin (B2B-XH-A), and matching plugs and crimps for your cables
+- a 1N5817 Schottky diode (for linking gates)
 - 1 × 4 and 1 × 6 2.54 mm pin headers, a 5 mm common-cathode RGB LED
 - a button for the RESET socket: the gate's MX key, or any push-to-make button on a cable
 
 And for the track: a sensor per lane, a start gate switch, optionally a remote reset button and
 displays. See [wiring](docs/wiring.md).
 
-You only need to fit as many lane sockets and resistor sets as you have lanes.
+You only need to fit as many lane sockets and resistor sets as you have lanes, and the links (J13, J14, R41-R46,
+D2) only to join gates.
 
 ## 3. Solder it
 

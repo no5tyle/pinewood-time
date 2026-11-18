@@ -5,8 +5,8 @@
 #ifndef PT_BOARD_H
 #define PT_BOARD_H
 
-/* Lane finish sensors: lane 1 on GP0 to lane 12 on GP11, so they all read in one go. This board has
- * sockets for lanes 1 to 8; lanes 9 to 12 (GP8 to GP11) need a board with more lane sockets */
+/* Lane finish sensors: lane 1 on GP0 to lane 8 on GP7, so they all read in one go. Boards from v1.2 have
+ * sockets for lanes 1 to 4 (more lanes come from linked gates); v1.1 boards have all eight */
 #define PIN_LANE_FIRST 0
 
 #define PIN_I2C_SDA 16 /* lane displays (I2C0) */
@@ -24,6 +24,14 @@
 #define PIN_GATE_2 PIN_AUX_1
 #define PIN_GATE_3 PIN_AUX_2
 #define PIN_GATE_4 PIN_AUX_3
+
+/* Links to other gates (link.c), on the Pico's two UARTs; unconnected on v1.1 boards.
+ * LINK IN (towards the main gate) on UART0, LINK OUT (towards the next gate) on UART1 */
+#define PIN_LINK_IN_TX 12
+#define PIN_LINK_IN_RX 13
+#define PIN_LINK_OUT_TX 8
+#define PIN_LINK_OUT_RX 9
+#define LINK_BAUD 115200
 
 /* Lane displays: HT16K33 4-digit LED backpacks, lane 1 at 0x70 to lane 8 at 0x77 */
 #define DISPLAY_ADDR_FIRST 0x70

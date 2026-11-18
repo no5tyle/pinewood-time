@@ -60,7 +60,7 @@ across power cycles (in the Pico's flash).
 
 | Send | Does |
 |---|---|
-| `#lanes 6` | Lanes in use, 1 to 12 (default 4). The board has sockets for 8. |
+| `#lanes 3` | This gate's own lanes, 1 to 8 (default 4). The board has sockets for 4 (v1.1 boards, 8). Linked gates' lanes are added after them. |
 | `#lane-trip high` / `low` | Whether a lane input goes high (default, for break-beam receivers) or low when a car crosses. |
 | `#gate-trip high` / `low` | Whether the gate input goes high (default: a switch held closed by the shut gate, which opens as the gate drops) or low when the gate opens. |
 | `#brightness 6` | Lane display brightness, 0 to 15. |
@@ -94,19 +94,40 @@ open, `next` falls back to a reset, so the button still does something useful on
 #save
 ```
 
+## Linked gates
+
+Finish gates [linked](wiring.md#linking-gates) LINK OUT to LINK IN race as one heat. The race software only
+talks to the main gate (the one with nothing on its LINK IN), and sees one timer with every gate's lanes:
+the main gate's own first, then each linked gate's in cable order. `N` reports them all (`numl=9`).
+
+- **Getting ready:** `R` asks every gate to get ready. The main gate replies `K` once they all have, or `O`
+  if any start gate is open or a gate doesn't answer.
+- **Masks** (`M`) reach the gate the lane is on. Lanes 10 to 12 are `MA`, `MB` and `MC`.
+- **The race** starts (`B`) when the first start gate opens. Each gate times its lanes from its own start
+  gate, on its own clock, and sends its times to the main gate when its lanes are in; the main gate sends
+  the results (and places) for every lane once they're all there.
+- **Ending early** (`F`, `R` mid-race, or the main gate's button) ends every gate's race. A gate that doesn't
+  answer within a second gets no times for its lanes.
+- **Unplugging** a gate takes its lanes out of the next heat (`N` shows it). On its own, it's a single timer
+  again.
+- `#info` on the main gate shows the linked lanes.
+
+The gates' clocks are each accurate to about ±30 parts in a million, so over a 3-second run two tracks can
+differ by up to about 0.1 ms. That's below the 0.001 s race software shows, but compare with the same car on
+each track if the fourth decimal place matters.
+
 ## Several tracks, several start gates
 
-Tracks side by side can race together as one heat: two 3-lane tracks as 6 lanes, up to four as 12. Each
+One board can also time two tracks (or more, up to its lanes) that share its finish gate, each with its
+own start gate. For tracks with a finish gate each, [link the gates](#linked-gates) instead. Each
 track has its own start gate, and each lane is timed from its own track's gate, so a gate that drops a
 moment late doesn't cost its cars anything.
 
 Every lane starts on gate 1. Move lanes to gates 2 to 4 with:
 
 ```
-#lanes 12
-#gate2 4-6
-#gate3 7-9
-#gate4 10-12
+#lanes 4
+#gate2 3-4
 #save
 ```
 

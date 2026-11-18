@@ -16,10 +16,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/* Lanes in a race: this timer's own, plus any on linked gates (link.c), up to 12 */
 #define PT_MAX_LANES 12
+/* Lanes on one board: lane 1 on GP0 to lane 8 on GP7 (the board from v1.2 has sockets for 4) */
+#define PT_MAX_LOCAL_LANES 8
 /* Start gates: each lane is timed from the gate its track starts from (several tracks side by side) */
 #define PT_MAX_GATES 4
-#define PT_VERSION "1.2.0"
+#define PT_VERSION "1.3.0"
 /* The PDT protocol version this timer implements, reported for the V command */
 #define PT_PROTOCOL_VERSION "3.40"
 
@@ -32,7 +35,7 @@ typedef enum {
 } pt_mode;
 
 typedef struct {
-    uint8_t num_lanes;      /* lanes on the track, 1 to 12 */
+    uint8_t num_lanes;      /* this timer's own lanes, 1 to 8 */
     bool lane_trip_high;    /* a lane triggers when its input goes high (beam broken, this board's sensors) */
     bool gate_trip_high;    /* the race starts when the gate input goes high */
     uint8_t brightness;     /* lane displays, 0 to 15 */
@@ -49,6 +52,13 @@ typedef struct {
     pt_mode mode;
     uint16_t mask;           /* lanes left out of this race (bit 0 = lane 1) */
     uint16_t finished;       /* lanes that have crossed the line */
+    /* Linked gates (link.c), on the main timer only: their lanes follow this timer's own */
+    uint8_t remote_lanes;    /* how many lanes the linked gates have */
+    uint16_t no_time;        /* lanes reported without a time (a linked gate's, or this one's at a forced end) */
+    bool arming;             /* reset: waiting for the linked gates to say they're ready */
+    bool ending;             /* ended early: waiting for the linked gates' results */
+    uint64_t end_deadline;   /* when to stop waiting for them (0 = not set yet) */
+    uint8_t events;          /* PT_EV_* for the link to act on; it clears them */
     uint8_t started;         /* gates that have opened in this race (bit 0 = gate 1) */
     uint64_t start_us[PT_MAX_GATES]; /* when each gate opened */
     uint32_t lane_us[PT_MAX_LANES]; /* time from the start, in microseconds */
@@ -66,6 +76,12 @@ typedef struct {
     pt_write_fn write;
     void *ctx;
 } pt_timer;
+
+/* Things for the link (link.c) to pass on */
+#define PT_EV_ARM 0x01      /* main: reset; ask the linked gates to get ready (then pt_chain_ready) */
+#define PT_EV_END 0x02      /* main: the race was ended early; tell the linked gates */
+#define PT_EV_STARTED 0x04  /* this timer's race started (its gate opened) */
+#define PT_EV_FINISHED 0x08 /* this timer's lanes are all in: its results are ready */
 
 /* What the hardware tells the core about, when it asks */
 typedef struct {
@@ -88,8 +104,27 @@ void pt_receive(pt_timer *t, char c, const pt_inputs *in);
 void pt_gate_tripped(pt_timer *t, uint8_t gate, uint64_t now_us);
 /* A lane's beam broke at this time (lane 0 = lane 1). Only the first break in a race counts */
 void pt_lane_tripped(pt_timer *t, uint8_t lane, uint64_t now_us);
-/* Ends the race now (F, or the reset button while racing): lanes still out get no time */
+/* Ends the race now (F, or the reset button while racing): lanes still out get no time. With linked
+ * gates, the results wait (up to a second) for theirs */
 void pt_force_end(pt_timer *t);
+/* The clock, for the wait above */
+void pt_tick(pt_timer *t, uint64_t now_us);
+
+/* ---- Linked gates (link.c) */
+/* Every lane in this race: this timer's and the linked gates' */
+uint8_t pt_total_lanes(const pt_timer *t);
+/* Main: the linked gates have this many lanes (applied between races) */
+void pt_set_remote_lanes(pt_timer *t, uint8_t lanes);
+/* Main: the linked gates answered the reset: all ready, or not (a gate open, or no answer) */
+void pt_chain_ready(pt_timer *t, bool ready);
+/* Main: a linked gate's race started */
+void pt_remote_started(pt_timer *t);
+/* Main: a linked gate's result for a lane (0 = lane 1, counted across every gate) */
+void pt_remote_result(pt_timer *t, uint8_t lane, bool has_time, uint32_t us);
+/* Secondary: the main timer reset, with these of this timer's lanes left out. False if its gate is open */
+bool pt_link_arm(pt_timer *t, uint16_t mask, const pt_inputs *in);
+/* Whether a lane has a time (for sending results on) */
+bool pt_lane_has_time(const pt_timer *t, uint8_t lane);
 /* What the reset button does, decided by the core */
 typedef enum {
     PT_BUTTON_NOTHING,   /* handled here: reset, race ended, or next heat asked for */

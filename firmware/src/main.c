@@ -12,6 +12,8 @@
 #include "board.h"
 #include "display.h"
 #include "hardware/gpio.h"
+#include "hardware/uart.h"
+#include "link.h"
 #include "pico/stdlib.h"
 #include "settings.h"
 #include "timer_core.h"
@@ -19,7 +21,7 @@
 
 /* ---------------------------------------------------------------- Events from the interrupt */
 typedef struct {
-    uint8_t kind; /* 0..11 = that lane, EVENT_GATE + gate, EVENT_RESET */
+    uint8_t kind; /* 0..7 = that lane, EVENT_GATE + gate, EVENT_RESET */
     uint64_t at_us;
 } event;
 
@@ -44,7 +46,7 @@ static void push(uint8_t kind, uint64_t at_us) {
 
 static void on_edge(uint gpio, uint32_t events) {
     uint64_t now = time_us_64(); /* first, so the time is when it happened */
-    if (gpio < PIN_LANE_FIRST + PT_MAX_LANES) {
+    if (gpio < PIN_LANE_FIRST + PT_MAX_LOCAL_LANES) {
         push((uint8_t)(gpio - PIN_LANE_FIRST), now);
         return;
     }
@@ -66,7 +68,7 @@ static void on_edge(uint gpio, uint32_t events) {
 static uint32_t trip_edge(bool trip_high) { return trip_high ? GPIO_IRQ_EDGE_RISE : GPIO_IRQ_EDGE_FALL; }
 
 static void set_up_inputs(void) {
-    for (uint8_t lane = 0; lane < PT_MAX_LANES; lane++) {
+    for (uint8_t lane = 0; lane < PT_MAX_LOCAL_LANES; lane++) {
         uint pin = PIN_LANE_FIRST + lane;
         gpio_init(pin);
         gpio_set_dir(pin, GPIO_IN);
@@ -102,7 +104,7 @@ static void set_up_inputs(void) {
 
 static pt_inputs read_inputs(void) {
     uint32_t all = gpio_get_all();
-    pt_inputs in = {.gates_open = 0, .lane_raw = (uint16_t)((all >> PIN_LANE_FIRST) & ((1u << PT_MAX_LANES) - 1u))};
+    pt_inputs in = {.gates_open = 0, .lane_raw = (uint16_t)((all >> PIN_LANE_FIRST) & ((1u << PT_MAX_LOCAL_LANES) - 1u))};
     for (uint8_t g = 0; g < PT_MAX_GATES; g++)
         if ((gates_used & (1u << g)) && ((((all >> gate_pins[g]) & 1u) != 0) == cfg.gate_trip_high))
             in.gates_open |= (uint8_t)(1u << g);
@@ -180,6 +182,28 @@ static void show_lanes(const pt_timer *t, uint64_t now_us) {
     }
 }
 
+/* ---------------------------------------------------------------- Links to other gates */
+static void set_up_links(void) {
+    uart_init(uart0, LINK_BAUD);
+    gpio_set_function(PIN_LINK_IN_TX, GPIO_FUNC_UART);
+    gpio_set_function(PIN_LINK_IN_RX, GPIO_FUNC_UART);
+    gpio_pull_up(PIN_LINK_IN_RX); /* nothing plugged in reads as an idle line */
+    uart_init(uart1, LINK_BAUD);
+    gpio_set_function(PIN_LINK_OUT_TX, GPIO_FUNC_UART);
+    gpio_set_function(PIN_LINK_OUT_RX, GPIO_FUNC_UART);
+    gpio_pull_up(PIN_LINK_OUT_RX);
+}
+
+static void link_send_up(const char *line, void *ctx) {
+    (void)ctx;
+    uart_puts(uart0, line);
+}
+
+static void link_send_down(const char *line, void *ctx) {
+    (void)ctx;
+    uart_puts(uart1, line);
+}
+
 /* ---------------------------------------------------------------- Main loop */
 int main(void) {
     usb_init();
@@ -196,6 +220,9 @@ int main(void) {
 
     static pt_timer timer;
     pt_init(&timer, &cfg, write_usb, NULL);
+    set_up_links();
+    static pt_link link;
+    link_init(&link, &timer, link_send_up, link_send_down, NULL);
     /* Holding the reset button while powering on starts sensor test mode */
     if (!gpio_get(PIN_RESET)) pt_enter_test(&timer);
 
@@ -207,14 +234,16 @@ int main(void) {
         while (queue_tail != queue_head) {
             event e = {queue[queue_tail].kind, queue[queue_tail].at_us};
             queue_tail = (queue_tail + 1) % QUEUE_SIZE;
-            if (e.kind < PT_MAX_LANES) {
+            if (e.kind < PT_MAX_LOCAL_LANES) {
                 pt_lane_tripped(&timer, e.kind, e.at_us);
             } else if (e.kind >= EVENT_GATE && e.kind < EVENT_GATE + PT_MAX_GATES) {
                 pt_gate_tripped(&timer, (uint8_t)(e.kind - EVENT_GATE), e.at_us);
             } else if (e.kind == EVENT_RESET) {
                 /* ends a race, leaves test mode, or resets / asks for the next heat (#button) */
-                if (pt_button(&timer, &in, usb_host_listening()) == PT_BUTTON_LEAVE_TEST)
+                if (pt_button(&timer, &in, usb_host_listening()) == PT_BUTTON_LEAVE_TEST) {
                     pt_init(&timer, &cfg, write_usb, NULL); /* start as if just powered on */
+                    link_init(&link, &timer, link_send_up, link_send_down, NULL);
+                }
             }
         }
 
@@ -226,6 +255,10 @@ int main(void) {
         usb_task();
         int c;
         while ((c = usb_read()) >= 0) pt_receive(&timer, (char)c, &in);
+
+        while (uart_is_readable(uart0)) link_from_up(&link, (char)uart_getc(uart0), now, &in);
+        while (uart_is_readable(uart1)) link_from_down(&link, (char)uart_getc(uart1), now, &in);
+        link_poll(&link, time_us_64());
 
         if (timer.config_changed) {
             timer.config_changed = false;

@@ -14,6 +14,7 @@ pico_sdk_init()
 add_executable(pinewood_time
     src/main.c
     src/timer_core.c
+    src/link.c
     src/display.c
     src/settings.c
     src/usb.c
@@ -32,6 +33,7 @@ target_link_libraries(pinewood_time
     hardware_i2c
     hardware_flash
     hardware_gpio
+    hardware_uart
 )
 
 # No stdio: the serial port is usb.c's

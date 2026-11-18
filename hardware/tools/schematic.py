@@ -76,8 +76,8 @@ def panel(x, y, w, h, title, sub=""):
         txt(x + 16, y + 44, sub, 12, c=MUTED)
 
 
-# ---- Lane input, x8
-panel(20, 20, 560, 300, "Lane sensor input  (x8, lane n = 1..8)", "Jn: JST XH 4-pin, lane n to GP(n-1)")
+# ---- Lane input, x4
+panel(20, 20, 560, 300, "Lane sensor input  (x4, lane n = 1..4)", "Jn: JST XH 4-pin, lane n to GP(n-1)")
 px = 80
 for k, (name, y) in enumerate([("1 LED+", 110), ("2 SIG", 170), ("3 GND", 230), ("4 5V", 280)]):
     pin(px, y, name)
@@ -148,11 +148,41 @@ for k, (name, caps) in enumerate([("5V", [("C1", "100µF")]), ("3V3", [("C2", "1
         line((x, y), (x, y + 18)); line((x - 12, y + 18), (x + 12, y + 18), w=2); line((x - 12, y + 24), (x + 12, y + 24), w=2)
         line((x, y + 24), (x, y + 34)); gnd(x, y + 34)
         txt(x + 16, y + 26, f"{c} {v}", 12)
-txt(816, 590, "J12 (AUX): GND, 3V3, 5V, GP26, GP27, GP28 for extras.", 11, c=MUTED)
+txt(816, 590, "J12 (AUX): GND, 3V3, 5V, GP26-28 (start gates 2-4, or extras).", 11, c=MUTED)
 
-svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" width="1200" height="620" '
+# ---- Links to the other gates
+panel(20, 620, 1160, 340, "Links to other gates  (J13 LINK IN, J14 LINK OUT)",
+      "JST XH 4-pin. A straight cable joins one gate's LINK OUT to the next gate's LINK IN: OUT's pin 3 sends, IN's pin 3 receives")
+for k, (j, tx, rx, rt, rp, rr, pins) in enumerate([
+        ("J13 LINK IN", "GP12", "GP13", "R41", "R42", "R43", ("1 5V in", "2 GND", "3 RX", "4 TX")),
+        ("J14 LINK OUT", "GP8", "GP9", "R44", "R45", "R46", ("1 5V out", "2 GND", "3 TX", "4 RX"))]):
+    x0 = 90 + k * 580
+    txt(x0, 700, j, 13, "middle", weight=700)
+    ys = [730, 770, 820, 900]
+    for name, y in zip(pins, ys):
+        pin(x0, y, name)
+    # data: out through 1k; in through 1k, pulled up at the socket so an empty socket reads idle
+    out_y, in_y = (ys[3], ys[2]) if k == 0 else (ys[2], ys[3])
+    res(x0 + 4, out_y, 330 + k * 580, out_y, rt, "1k"); gpio(332 + k * 580, out_y, tx + " TX")
+    px = 200 + k * 580
+    line((x0 + 4, in_y), (px, in_y)); dot(px, in_y)
+    res(px, in_y, px, in_y + 36, rp, "10k")  # below its line, the pull-up to 3V3
+    line((px - 10, in_y + 36), (px + 10, in_y + 36), w=2); txt(px + 16, in_y + 40, "3V3", 11, c=ACCENT, weight=600)
+    res(px, in_y, 330 + k * 580, in_y, rr, "1k"); gpio(332 + k * 580, in_y, rx + " RX")
+    line((x0 + 4, ys[1]), (150 + k * 580, ys[1])); gnd(150 + k * 580, ys[1])
+    if k == 0:  # 5V in through the Schottky to the 5V rail
+        line((x0 + 4, ys[0]), (200, ys[0]))
+        el.append(f'<polygon points="200,{ys[0] - 9} 200,{ys[0] + 9} 218,{ys[0]}" fill="#fff" stroke="{INK}" stroke-width="1.6"/>')
+        line((218, ys[0] - 9), (218, ys[0] + 9))
+        txt(209, ys[0] - 14, "D2 1N5817", 11, "middle", MUTED)
+        line((218, ys[0]), (300, ys[0])); rail(300, ys[0], "5V")
+    else:
+        line((x0 + 4, ys[0]), (x0 + 120, ys[0])); rail(x0 + 120, ys[0], "5V")
+txt(36, 950, "The main gate's USB powers the chain. The diode stops a gate that's on USB itself from feeding the gate before it.", 11, c=MUTED)
+
+svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 980" width="1200" height="980" '
        f'font-family="Inter, -apple-system, Segoe UI, Roboto, sans-serif">'
-       f'<rect width="1200" height="620" fill="#ffffff"/>' + "".join(el) + "</svg>")
+       f'<rect width="1200" height="980" fill="#ffffff"/>' + "".join(el) + "</svg>")
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 open(OUT, "w").write(svg)
 print(OUT)

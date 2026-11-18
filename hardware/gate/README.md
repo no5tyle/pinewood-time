@@ -173,6 +173,20 @@ Above the board there's 20 mm to the cover. That's room for the upright resistor
 their plugs in, and the Pico on short headers; the MX key sits over the Pico. Solder the Pico flat or on
 2.5 mm headers, not on tall sockets.
 
+## Linking gates
+
+Tracks side by side each get a gate, and the gates [link](../../docs/wiring.md#linking-gates) into one
+timer: every gate is printed and built the same. Put the main gate (the one plugged into the computer) on the
+left-hand track, so the links run left to right:
+
+- **LINK IN** (from the gate on the left): its cable comes in at the slot at the back of the left leg and up
+  the left leg's channel, with the emitter lead and the start gate cable.
+- **LINK OUT** (to the gate on the right): its cable goes down the right leg's channel and out of the slot
+  at its back, beside the USB lead.
+
+Both sockets are in the middle of the board, so the cables run along the beam under it. The main gate's USB
+powers the gates after it, so they don't need a USB lead.
+
 ## Assembly
 
 1. Press the M4 nuts into the hex pockets under the ends of the sensor bar, the M3 nuts into the hex
